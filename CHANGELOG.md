@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] — 2026-10-21 — **TechScript 2.0.0 — Stable Release**
+
+> **Release Tag:** `v2.0.0`  
+> **Release Name:** `TechScript 2.0.0 — Stable Release`  
+> **License:** Apache License 2.0  
+> **Website:** https://is-a.dev/techscript/
+
+### Added
+
+- **WebForge Full-Stack Framework**: Complete declarative web development in native TechScript (`.txs`). Multi-page routing with client SPA navigation, direct deep URL route handling, and automatic 404 fallback.
+- **Embedded WebGL 3D Studio & CSG**: Zero-external-dependency procedural 3D viewport and Three.js r128 integration with Binary Space Partitioning (CSG boolean operations: union, subtract, intersect) and browser-side geometry exports (GLTF, OBJ, STL).
+- **SQLite Database Persistence**: Built-in declarative `database` and `table` schema generation with live REST API backend endpoints (`/api/<table_name>`) and client-side reactive dynamic loading.
+- **Modern Web UI Components**: Native DSL support for responsive cards, stat grids, interactive timelines, accordions, animated tabs, alert banners, and form validations.
+- **Full Conformance Test Suite**: 12 comprehensive end-to-end tests validating multi-page layout, responsive CSS animations, interactive button state, form validation, reusable components, API data fetching, real backend JSON endpoints, SQLite persistence, 3D CSG modeling, 3rd-party JS interop, deep URL routing, and production build generation.
+- **Cross-Platform Release Automation**: Automated CI/CD workflows building Windows (`x86_64`), Linux (`x86_64`, `aarch64`), macOS (`x86_64`, `aarch64`), and Android Termux (`aarch64-linux-android`) with SHA-256 checksums and automated GitHub Pages deployment for `is-a.dev/techscript/`.
+
+### Fixed
+
+- Block parsing: container boundary termination for nested blocks (`stats`, `timeline`, `accordion`, `tabs`, `item`, `step`, `milestone`, `tab`, `alert`) without premature loop exits.
+- Semantic symbol hoisting for DSL element handles (`called <Name>`, `as <Name>`, `id is "..."`) and registration of built-in web APIs and event tokens.
+- SQLite query identifier sanitization preserving uppercase/lowercase alphanumeric characters while stripping non-alphanumeric punctuation.
+- Direct URL SPA routing on local servers (`stdlib/src/web/server.rs`) and client router popstate handling.
+
+---
+
+### Added
+
+- Release revision documentation in `docs/ReleaseNotes.md`, covering the complete change set since `v2.0.0`.
+- `tsc lint --fix` support for applying safe linter fixes from the command line.
+- Additional stdlib registration and behavior tests across database, CSV, JWT, PDF, FTP, math, media, and notification modules.
+- Additional AST, parser, runtime, web, and package-manager coverage for previously untested paths.
+
+### Fixed
+
+- Reduced formatter, VM debugger, bytecode disassembler, LSP, IR, package-manager, and stdlib allocation overhead on hot paths.
+- Closed missing capability checks in web, notification, canvas, and related privileged operations.
+- Fixed command-injection risks in the doctor command and Windows notification handling.
+- Corrected the loopback IP safety validation and several documentation links.
+
+### Changed
+
+- Optimized IR predecessor mapping, diagnostic quick-fix lookup, LSP character lookup, SQLite query preparation, and capability validation.
+- Refactored large stdlib, DSL, semantic-analysis, resolver, packager, and CLI functions into smaller units without changing public behavior.
+- Added release guidance for the `vMAJOR.MINOR.PATCH.REVISION` tag convention. Cargo packages remain at SemVer `2.0.0` for this revision release.
+
+---
+
 ## [2.0.0] — 2026-07-26 — **Syntax Freeze**
 
 > _No breaking syntax changes will be made after this release in the 2.x series._

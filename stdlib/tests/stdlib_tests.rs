@@ -1,7 +1,10 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
-use techscript_runtime::{context::Capability, value::RuntimeValue, RuntimeConfig, RuntimeContext};
+use techscript_runtime::{
+    context::Capability, error::RuntimeErrorKind, value::RuntimeValue, RuntimeConfig,
+    RuntimeContext,
+};
 use techscript_stdlib::StdlibRegistry;
 
 #[test]
@@ -408,27 +411,11 @@ fn test_regex_operations() {
 }
 
 #[test]
-fn test_http_module() {
-    use std::io::{Read, Write};
+fn test_web_module() {
     use std::net::TcpListener;
-    use std::thread;
-
-    // Start a simple mock TCP server on a random port
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = listener.local_addr().unwrap().port();
-
-    thread::spawn(move || {
-        if let Ok((mut stream, _)) = listener.accept() {
-            let mut buf = [0; 1024];
-            if stream.read(&mut buf).is_ok() {
-                let response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\nContent-Type: text/plain\r\n\r\nHello Server!";
-                stream.write_all(response.as_bytes()).ok();
-            }
-        }
-    });
 
     let registry = StdlibRegistry::new();
-    let http = registry.get_module("std.http").unwrap();
+    let web = registry.get_module("std.web").unwrap();
 
     let mut caps = HashSet::new();
     caps.insert(Capability::Network);
@@ -439,7 +426,153 @@ fn test_http_module() {
         capabilities: caps,
     });
 
+    let start = web.exports.get("start").unwrap();
+    let serve = web.exports.get("serve").unwrap();
+    let stop = web.exports.get("stop").unwrap();
+
+    // Bind a listener to a random port to ensure the port is taken
+    // Keep it alive to conflict
+    let listener = TcpListener::bind("0.0.0.0:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+
+    // Test that `start` returns an error when port is in use
+    let start_result = start.call(
+        &mut ctx,
+        vec![
+            RuntimeValue::Int(port as i64),
+            RuntimeValue::Str("<h1>Test</h1>".to_string()),
+        ],
+    );
+
+    assert!(
+        start_result.is_err(),
+        "Expected `start` to return an error due to port already in use"
+    );
+    assert!(
+        start_result
+            .unwrap_err()
+            .message
+            .contains("Failed to start server"),
+        "Expected error message to mention failure to start server"
+    );
+
+    // Test that `serve` returns an error when port is in use
+    let serve_result = serve.call(&mut ctx, vec![RuntimeValue::Int(port as i64)]);
+
+    assert!(
+        serve_result.is_err(),
+        "Expected `serve` to return an error due to port already in use"
+    );
+    assert!(
+        serve_result
+            .unwrap_err()
+            .message
+            .contains("Failed to start server"),
+        "Expected error message to mention failure to start server"
+    );
+
+    // Reset `SERVER_RUNNING` so other tests aren't affected
+    let _ = stop.call(&mut ctx, vec![]).unwrap();
+}
+
+#[test]
+fn test_http_module_capability_denied() {
+    let registry = StdlibRegistry::new();
+    let http = registry.get_module("std.http").unwrap();
+
+    let mut config_unprivileged = RuntimeConfig::default();
+    config_unprivileged
+        .capabilities
+        .remove(&Capability::Network);
+    let mut ctx_unprivileged = RuntimeContext::new(config_unprivileged);
+
     let get = http.exports.get("get").unwrap();
+    let res = get.call(
+        &mut ctx_unprivileged,
+        vec![RuntimeValue::Str("http://example.com".to_string())],
+    );
+
+    assert!(res.is_err());
+    let err = res.unwrap_err();
+    match err.kind {
+        RuntimeErrorKind::InvalidOperation(msg) => {
+            assert!(msg.contains("Security policy violation: Network capability is denied"));
+        }
+        _ => panic!("Expected InvalidOperation error"),
+    }
+}
+
+#[test]
+fn test_http_module() {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::thread;
+
+    // Start a simple mock TCP server on a random port
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+
+    thread::spawn(move || {
+        while let Ok((mut stream, _)) = listener.accept() {
+            let mut buf = [0; 4096];
+            let _ = stream.read(&mut buf);
+            let response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nHello Server!";
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.flush();
+        }
+    });
+
+    let registry = StdlibRegistry::new();
+    let http = registry.get_module("std.http").unwrap();
+
+    // Test without Network capability
+    let mut ctx_unprivileged = RuntimeContext::new(RuntimeConfig {
+        strict_mode: false,
+        max_recursion_depth: 1000,
+        enable_assertions: true,
+        capabilities: HashSet::new(),
+    });
+
+    let get = http.exports.get("get").unwrap();
+    let res_get = get.call(
+        &mut ctx_unprivileged,
+        vec![RuntimeValue::Str(format!("http://127.0.0.1:{}", port))],
+    );
+    assert!(
+        matches!(res_get, Err(techscript_runtime::RuntimeError { kind: techscript_runtime::RuntimeErrorKind::InvalidOperation(msg), .. }) if msg.contains("Security policy violation"))
+    );
+
+    let post = http.exports.get("post").unwrap();
+    let res_post = post.call(
+        &mut ctx_unprivileged,
+        vec![
+            RuntimeValue::Str(format!("http://127.0.0.1:{}", port)),
+            RuntimeValue::Str("body".to_string()),
+        ],
+    );
+    assert!(
+        matches!(res_post, Err(techscript_runtime::RuntimeError { kind: techscript_runtime::RuntimeErrorKind::InvalidOperation(msg), .. }) if msg.contains("Security policy violation"))
+    );
+
+    let listen = http.exports.get("listen").unwrap();
+    let res_listen = listen.call(
+        &mut ctx_unprivileged,
+        vec![RuntimeValue::Int(8080), RuntimeValue::Null],
+    );
+    assert!(
+        matches!(res_listen, Err(techscript_runtime::RuntimeError { kind: techscript_runtime::RuntimeErrorKind::InvalidOperation(msg), .. }) if msg.contains("Security policy violation"))
+    );
+
+    // Test with Network capability
+    let mut caps = HashSet::new();
+    caps.insert(Capability::Network);
+    let mut ctx = RuntimeContext::new(RuntimeConfig {
+        strict_mode: false,
+        max_recursion_depth: 1000,
+        enable_assertions: true,
+        capabilities: caps,
+    });
+
     let res = get
         .call(
             &mut ctx,
@@ -456,6 +589,38 @@ fn test_http_module() {
         );
     } else {
         panic!("get did not return a Map");
+    }
+
+    let res2 = match post.call(
+        &mut ctx,
+        vec![
+            RuntimeValue::Str(format!("http://127.0.0.1:{}", port)),
+            RuntimeValue::Str("body".to_string()),
+        ],
+    ) {
+        Ok(v) => v,
+        Err(_) => {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            post.call(
+                &mut ctx,
+                vec![
+                    RuntimeValue::Str(format!("http://127.0.0.1:{}", port)),
+                    RuntimeValue::Str("body".to_string()),
+                ],
+            )
+            .unwrap()
+        }
+    };
+
+    if let RuntimeValue::Map { entries, .. } = res2 {
+        let entries_borrow = entries.borrow();
+        assert_eq!(entries_borrow.get("status").unwrap().as_int(), Some(200));
+        assert_eq!(
+            entries_borrow.get("body").unwrap().as_string(),
+            Some("Hello Server!")
+        );
+    } else {
+        panic!("post did not return a Map");
     }
 }
 
@@ -893,13 +1058,30 @@ fn test_crypto_hash_and_compression() {
     let key = RuntimeValue::Str("my_secret_key_123".to_string());
     let plain = RuntimeValue::Str("hello crypto world".to_string());
 
-    let encrypted = aes_enc
-        .call(&mut ctx_unprivileged, vec![key.clone(), plain])
+    let encrypted1 = aes_enc
+        .call(&mut ctx_unprivileged, vec![key.clone(), plain.clone()])
         .unwrap();
-    let decrypted = aes_dec
-        .call(&mut ctx_unprivileged, vec![key, encrypted])
+
+    let encrypted2 = aes_enc
+        .call(&mut ctx_unprivileged, vec![key.clone(), plain.clone()])
         .unwrap();
-    assert_eq!(decrypted.as_string(), Some("hello crypto world"));
+
+    // Verify deterministic encryption is fixed (random nonce is working)
+    assert_ne!(
+        encrypted1.as_string().unwrap(),
+        encrypted2.as_string().unwrap(),
+        "Encrypting the same plaintext with the same key should produce different ciphertexts"
+    );
+
+    let decrypted1 = aes_dec
+        .call(&mut ctx_unprivileged, vec![key.clone(), encrypted1])
+        .unwrap();
+    assert_eq!(decrypted1.as_string(), Some("hello crypto world"));
+
+    let decrypted2 = aes_dec
+        .call(&mut ctx_unprivileged, vec![key.clone(), encrypted2])
+        .unwrap();
+    assert_eq!(decrypted2.as_string(), Some("hello crypto world"));
 
     let bcrypt_hash = crypto.exports.get("bcrypt_hash").unwrap();
     let bcrypt_verify = crypto.exports.get("bcrypt_verify").unwrap();
@@ -1133,4 +1315,19 @@ fn test_ai_generate_text() {
     assert!(res.is_ok());
     let val = res.unwrap();
     assert!(val.as_string().unwrap().contains("Prompt: What is 2+2?"));
+}
+
+#[test]
+fn test_uuid_module() {
+    let registry = StdlibRegistry::new();
+    let uuid_mod = registry.get_module("std.uuid").unwrap();
+
+    let mut ctx = RuntimeContext::new(RuntimeConfig::default());
+
+    let uuid_v4 = uuid_mod.exports.get("uuid_v4").unwrap();
+    let res = uuid_v4.call(&mut ctx, vec![]).unwrap();
+
+    let uuid_str = res.as_string().expect("Expected string");
+    assert!(!uuid_str.is_empty());
+    assert!(uuid_str.contains("-"));
 }

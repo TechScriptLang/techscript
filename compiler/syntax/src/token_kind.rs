@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Classification of literal values in TechScript 2.0.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, strum_macros::EnumIter,
+)]
 pub enum LiteralKind {
     /// Integer literal (e.g., `42`).
     Int,
@@ -21,14 +23,7 @@ pub enum LiteralKind {
 
 impl fmt::Display for LiteralKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let label = match self {
-            LiteralKind::Int => "Int",
-            LiteralKind::Float => "Float",
-            LiteralKind::Str => "Str",
-            LiteralKind::Bool => "Bool",
-            LiteralKind::Null => "Null",
-        };
-        write!(f, "{}", label)
+        fmt::Debug::fmt(self, f)
     }
 }
 
@@ -47,13 +42,7 @@ pub enum NumericLiteralKind {
 
 impl fmt::Display for NumericLiteralKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let label = match self {
-            NumericLiteralKind::Decimal => "Decimal",
-            NumericLiteralKind::Hex => "Hex",
-            NumericLiteralKind::Binary => "Binary",
-            NumericLiteralKind::Octal => "Octal",
-        };
-        write!(f, "{}", label)
+        fmt::Debug::fmt(self, f)
     }
 }
 
@@ -63,7 +52,9 @@ impl fmt::Display for NumericLiteralKind {
 /// - **Canonical 2.0**: The one true spelling — no warnings emitted.
 /// - **Deprecated Alias**: Old spelling — still parsed, but emits a `TSW1xxx` warning.
 /// - **Reserved**: Recognised by the lexer but not yet active.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, strum_macros::EnumIter,
+)]
 pub enum TokenKind {
     // ── Canonical 2.0 Keywords ──────────────────────────────────────────────────────
     /// `do` — function/method declaration (replaces `build`, `fun`, `function`)
@@ -791,18 +782,7 @@ impl fmt::Display for TokenKind {
         if let Some(lexeme) = self.static_lexeme() {
             write!(f, "'{}'", lexeme)
         } else {
-            let label = match self {
-                TokenKind::Identifier => "Identifier",
-                TokenKind::IntLiteral => "Integer Literal",
-                TokenKind::FloatLiteral => "Float Literal",
-                TokenKind::StringLiteral => "String Literal",
-                TokenKind::FStringText => "f-string segment",
-                TokenKind::Newline => "Newline",
-                TokenKind::Eof => "EOF",
-                TokenKind::Error => "Error",
-                _ => "Unknown Token",
-            };
-            write!(f, "{}", label)
+            fmt::Debug::fmt(self, f)
         }
     }
 }

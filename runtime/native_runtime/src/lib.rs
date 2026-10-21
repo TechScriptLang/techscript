@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
+use std::fmt::Write as FmtWrite;
 use std::io::{self, Write};
 use std::os::raw::{c_char, c_void};
 
@@ -201,6 +202,9 @@ pub unsafe extern "C" fn ts_free_value(val: *mut TsValue) {
         return;
     }
     let value = Box::from_raw(val);
+    if value.data.pointer.is_null() {
+        return;
+    }
     if value.tag == TsTag::String as u32 {
         let _ = Box::from_raw(value.data.pointer as *mut String);
     } else if value.tag == TsTag::List as u32 {
@@ -230,59 +234,113 @@ pub unsafe extern "C" fn ts_free_value(val: *mut TsValue) {
 }
 
 // Convert TsValue to Rust String helper
-unsafe fn value_to_string(val: *mut TsValue) -> String {
+unsafe fn value_to_string_impl(val: *mut TsValue, buf: &mut String) {
     if val.is_null() {
-        return "null".to_string();
+        let _ = write!(buf, "null");
+        return;
     }
     let v = &*val;
     if v.tag == TsTag::Null as u32 {
-        "null".to_string()
+        let _ = write!(buf, "null");
     } else if v.tag == TsTag::Bool as u32 {
-        v.data.boolean.to_string()
+        let _ = write!(buf, "{}", v.data.boolean);
     } else if v.tag == TsTag::Int as u32 {
-        v.data.integer.to_string()
+        let _ = write!(buf, "{}", v.data.integer);
     } else if v.tag == TsTag::Float as u32 {
-        v.data.float.to_string()
+        let _ = write!(buf, "{}", v.data.float);
     } else if v.tag == TsTag::String as u32 {
-        (*(v.data.pointer as *const String)).clone()
-    } else if v.tag == TsTag::List as u32 {
-        let list = &*(v.data.pointer as *const Vec<*mut TsValue>);
-        let mut parts = Vec::new();
-        for &item in list {
-            parts.push(value_to_string(item));
-        }
-        format!("[{}]", parts.join(", "))
-    } else if v.tag == TsTag::Map as u32 {
-        let map = &*(v.data.pointer as *const HashMap<String, *mut TsValue>);
-        let mut parts = Vec::new();
-        for (k, &val) in map {
-            parts.push(format!("{}: {}", k, value_to_string(val)));
-        }
-        format!("{{{}}}", parts.join(", "))
-    } else if v.tag == TsTag::Struct as u32 {
-        let s = &*(v.data.pointer as *const TsStruct);
-        let mut parts = Vec::new();
-        for (k, &val) in &s.fields {
-            parts.push(format!("{}: {}", k, value_to_string(val)));
-        }
-        format!("{} {{{}}}", s.name, parts.join(", "))
-    } else if v.tag == TsTag::Model as u32 {
-        let m = &*(v.data.pointer as *const TsModel);
-        let mut parts = Vec::new();
-        for (k, &val) in &m.fields {
-            parts.push(format!("{}: {}", k, value_to_string(val)));
-        }
-        format!("{} {{{}}}", m.name, parts.join(", "))
-    } else if v.tag == TsTag::Enum as u32 {
-        let e = &*(v.data.pointer as *const TsEnum);
-        if e.value.is_null() {
-            format!("{}.{}", e.name, e.variant)
+        if v.data.pointer.is_null() {
+            let _ = write!(buf, "null");
         } else {
-            format!("{}.{}({})", e.name, e.variant, value_to_string(e.value))
+            buf.push_str(&*(v.data.pointer as *const String));
+        }
+    } else if v.tag == TsTag::List as u32 {
+        if v.data.pointer.is_null() {
+            let _ = write!(buf, "[]");
+        } else {
+            let _ = write!(buf, "[");
+            let list = &*(v.data.pointer as *const Vec<*mut TsValue>);
+            for (i, &item) in list.iter().enumerate() {
+                if i > 0 {
+                    let _ = write!(buf, ", ");
+                }
+                value_to_string_impl(item, buf);
+            }
+            let _ = write!(buf, "]");
+        }
+    } else if v.tag == TsTag::Map as u32 {
+        if v.data.pointer.is_null() {
+            let _ = write!(buf, "{{}}");
+        } else {
+            let _ = write!(buf, "{{");
+            let map = &*(v.data.pointer as *const HashMap<String, *mut TsValue>);
+            let mut first = true;
+            for (k, &val) in map {
+                if !first {
+                    let _ = write!(buf, ", ");
+                }
+                first = false;
+                let _ = write!(buf, "{}: ", k);
+                value_to_string_impl(val, buf);
+            }
+            let _ = write!(buf, "}}");
+        }
+    } else if v.tag == TsTag::Struct as u32 {
+        if v.data.pointer.is_null() {
+            let _ = write!(buf, "unknown struct");
+        } else {
+            let s = &*(v.data.pointer as *const TsStruct);
+            let _ = write!(buf, "{} {{", s.name);
+            let mut first = true;
+            for (k, &val) in &s.fields {
+                if !first {
+                    let _ = write!(buf, ", ");
+                }
+                first = false;
+                let _ = write!(buf, "{}: ", k);
+                value_to_string_impl(val, buf);
+            }
+            let _ = write!(buf, "}}");
+        }
+    } else if v.tag == TsTag::Model as u32 {
+        if v.data.pointer.is_null() {
+            let _ = write!(buf, "unknown model");
+        } else {
+            let m = &*(v.data.pointer as *const TsModel);
+            let _ = write!(buf, "{} {{", m.name);
+            let mut first = true;
+            for (k, &val) in &m.fields {
+                if !first {
+                    let _ = write!(buf, ", ");
+                }
+                first = false;
+                let _ = write!(buf, "{}: ", k);
+                value_to_string_impl(val, buf);
+            }
+            let _ = write!(buf, "}}");
+        }
+    } else if v.tag == TsTag::Enum as u32 {
+        if v.data.pointer.is_null() {
+            let _ = write!(buf, "unknown enum");
+        } else {
+            let e = &*(v.data.pointer as *const TsEnum);
+            if e.value.is_null() {
+                let _ = write!(buf, "{}.{}", e.name, e.variant);
+            } else {
+                let _ = write!(buf, "{}.{}(", e.name, e.variant);
+                value_to_string_impl(e.value, buf);
+                let _ = write!(buf, ")");
+            }
         }
     } else {
-        "unknown".to_string()
+        let _ = write!(buf, "unknown");
     }
+}
+
+unsafe fn value_to_string(val: *mut TsValue) -> String {
+    let mut s = String::new();
+    value_to_string_impl(val, &mut s);
+    s
 }
 
 // Built-in functions
@@ -478,10 +536,11 @@ pub unsafe extern "C" fn ts_add(left: *mut TsValue, right: *mut TsValue) -> *mut
 
     // Concatenation if either is a string
     if l.tag == TsTag::String as u32 || r.tag == TsTag::String as u32 {
-        let l_str = value_to_string(left);
+        let mut l_str = value_to_string(left);
         let r_str = value_to_string(right);
-        let combined = format!("{}{}", l_str, r_str);
-        let combined_cstr = CString::new(combined).unwrap();
+        // Bolt ⚡: In-place string append avoids additional buffer allocations and format! overhead
+        l_str.push_str(&r_str);
+        let combined_cstr = CString::new(l_str).unwrap();
         return ts_alloc_string(combined_cstr.as_ptr());
     }
 
@@ -990,4 +1049,110 @@ pub unsafe extern "C" fn ts_await(val: *mut TsValue) -> *mut TsValue {
         }
     }
     val
+}
+
+use std::cell::RefCell;
+use std::ffi::c_int;
+
+// `libc::jmp_buf` is not exposed in the `libc` crate consistently across platforms,
+// so we define a generic opaque struct that is large enough and aligned.
+// A size of 2048 bytes (256 * 8) is vastly larger than needed by any OS for jmp_buf.
+#[repr(C, align(16))]
+pub struct JmpBuf {
+    data: [u64; 256],
+}
+
+extern "C" {
+    #[cfg_attr(target_os = "windows", link_name = "_setjmp")]
+    pub fn setjmp(env: *mut JmpBuf) -> c_int;
+    pub fn longjmp(env: *mut JmpBuf, val: c_int) -> !;
+}
+
+thread_local! {
+    static TRY_STACK: RefCell<Vec<*mut JmpBuf>> = const { RefCell::new(Vec::new()) };
+    static PENDING_EXCEPTION: RefCell<*mut TsValue> = const { RefCell::new(std::ptr::null_mut()) };
+}
+
+#[no_mangle]
+pub extern "C" fn ts_try_push() -> *mut JmpBuf {
+    // We allocate a jmp_buf on the heap and keep it on the stack.
+    let layout = std::alloc::Layout::new::<JmpBuf>();
+    let ptr = unsafe { std::alloc::alloc_zeroed(layout) as *mut JmpBuf };
+    TRY_STACK.with(|stack| {
+        stack.borrow_mut().push(ptr);
+    });
+    ptr
+}
+
+#[no_mangle]
+pub extern "C" fn ts_try_pop() {
+    let ptr = TRY_STACK.with(|stack| stack.borrow_mut().pop());
+    if let Some(p) = ptr {
+        let layout = std::alloc::Layout::new::<JmpBuf>();
+        unsafe {
+            std::alloc::dealloc(p as *mut u8, layout);
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ts_throw(val: *mut TsValue) -> ! {
+    PENDING_EXCEPTION.with(|exc| {
+        *exc.borrow_mut() = val;
+    });
+
+    let buf_ptr = TRY_STACK.with(|stack| {
+        let mut s = stack.borrow_mut();
+        if let Some(buf) = s.pop() {
+            buf
+        } else {
+            std::ptr::null_mut()
+        }
+    });
+
+    if buf_ptr.is_null() {
+        // Uncaught exception! We should abort or panic.
+        let msg = if val.is_null() {
+            "null".to_string()
+        } else {
+            let v = &*val;
+            if v.tag == TsTag::String as u32 {
+                let s = &*(v.data.pointer as *const String);
+                s.clone()
+            } else {
+                format!("exception tag {}", v.tag)
+            }
+        };
+        eprintln!("Uncaught Exception: {}", msg);
+        std::process::abort();
+    }
+
+    // Call longjmp (memory leak of the jmp buf happens here if we don't deallocate first!
+    // But since longjmp doesn't return, we can't deallocate it after.
+    // It's safe to deallocate before calling longjmp since setjmp execution is fully complete and we just need the values out of the struct. Wait, longjmp uses the buf ptr so we shouldn't dealloc before longjmp. We'll leave it allocated, but wait! longjmp jumps to the setjmp frame, which can deallocate the buffer. So we should NOT deallocate in try_pop if we arrived via longjmp, OR we deallocate the buffer in the Catch block via LLVM IR calling ts_free_buf, and remove ts_try_pop.
+    // Instead of leaking, let's keep it simple: ts_try_pop() frees it, so if an exception is thrown, ts_try_pop is skipped (because the instruction is after the Try block), so the Catch block needs to call ts_try_pop or equivalent?
+    // Let's create a dedicated function to clean it up after an exception.
+
+    // Call longjmp
+    longjmp(buf_ptr, 1);
+}
+
+#[no_mangle]
+pub extern "C" fn ts_try_free(buf_ptr: *mut JmpBuf) {
+    if !buf_ptr.is_null() {
+        let layout = std::alloc::Layout::new::<JmpBuf>();
+        unsafe {
+            std::alloc::dealloc(buf_ptr as *mut u8, layout);
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn ts_get_exception() -> *mut TsValue {
+    PENDING_EXCEPTION.with(|exc| {
+        let mut e = exc.borrow_mut();
+        let val = *e;
+        *e = std::ptr::null_mut();
+        val
+    })
 }

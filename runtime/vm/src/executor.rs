@@ -28,26 +28,19 @@ impl VM {
             let ip = frame.ip;
             frame.ip += 1;
 
-            let inst_operands = self.module.functions
-                [self.frames.last().unwrap().function_idx as usize]
-                .chunk
-                .instructions[ip]
-                .operands
-                .as_slice();
+            let inst_operands = inst.operands.as_slice();
 
             // Diagnostics and tracing
             self.profiler.record_instruction();
             self.profiler.record_stack_height(self.stack.len());
 
             if self.debugger.is_enabled() {
-                let current_func =
-                    &self.module.functions[self.frames.last().unwrap().function_idx as usize];
                 self.debugger.trace_instruction(
-                    current_func,
+                    func,
                     ip,
                     inst_op,
                     inst_operands,
-                    &self.stack.get_dump(),
+                    self.stack.data_slice(),
                 );
             }
 
@@ -56,9 +49,7 @@ impl VM {
 
                 Opcode::LoadConst => {
                     if let Some(Operand::ConstantIndex(c_idx)) = inst_operands.first() {
-                        let current_func = &self.module.functions
-                            [self.frames.last().unwrap().function_idx as usize];
-                        let lit = current_func
+                        let lit = func
                             .chunk
                             .constants
                             .get(*c_idx)
@@ -78,7 +69,7 @@ impl VM {
 
                 Opcode::LoadLocal => {
                     if let Some(Operand::LocalIndex(l_idx)) = inst_operands.first() {
-                        let bp = self.frames.last().unwrap().base_pointer;
+                        let bp = frame.base_pointer;
                         let val = self.stack.get(bp + *l_idx as usize)?;
                         self.stack.push(val.clone())?;
                     } else {
@@ -88,7 +79,7 @@ impl VM {
 
                 Opcode::StoreLocal => {
                     if let Some(Operand::LocalIndex(l_idx)) = inst_operands.first() {
-                        let bp = self.frames.last().unwrap().base_pointer;
+                        let bp = frame.base_pointer;
                         let val = self.stack.pop()?;
                         self.stack.set(bp + *l_idx as usize, val)?;
                     } else {
@@ -170,8 +161,10 @@ impl VM {
                         (RuntimeValue::Float(a), RuntimeValue::Float(b)) => {
                             RuntimeValue::Float(a + b)
                         }
-                        (RuntimeValue::Str(a), RuntimeValue::Str(b)) => {
-                            RuntimeValue::Str(format!("{}{}", a, b))
+                        (RuntimeValue::Str(mut a), RuntimeValue::Str(b)) => {
+                            // Bolt ⚡: In-place string append reuses buffer capacity and avoids fresh allocation
+                            a.push_str(&b);
+                            RuntimeValue::Str(a)
                         }
                         _ => {
                             return Err(VMError::TypeError {
@@ -458,9 +451,13 @@ impl VM {
                     self.stack.push(RuntimeValue::Bool(res))?;
                 }
 
+                // PERFORMANCE OPTIMIZATION (Bolt):
+                // We reuse the existing mutable `frame` reference acquired at the start of
+                // the loop iteration rather than redundantly calling `self.frames.last_mut()`
+                // for these control flow and exception opcodes. This reduces bounds checking
+                // and RefCell borrow overhead on the hottest execution paths.
                 Opcode::Jump => {
                     if let Some(Operand::JumpOffset(offset)) = inst_operands.first() {
-                        let frame = self.frames.last_mut().ok_or(VMError::StackUnderflow)?;
                         frame.ip = ((frame.ip as i32 - 1) + offset) as usize;
                     } else {
                         return Err(VMError::InvalidOpcode);
@@ -471,7 +468,6 @@ impl VM {
                     if let Some(Operand::JumpOffset(offset)) = inst_operands.first() {
                         let cond = self.stack.pop()?;
                         if cond.is_truthy() {
-                            let frame = self.frames.last_mut().ok_or(VMError::StackUnderflow)?;
                             frame.ip = ((frame.ip as i32 - 1) + offset) as usize;
                         }
                     } else {
@@ -483,7 +479,6 @@ impl VM {
                     if let Some(Operand::JumpOffset(offset)) = inst_operands.first() {
                         let cond = self.stack.pop()?;
                         if !cond.is_truthy() {
-                            let frame = self.frames.last_mut().ok_or(VMError::StackUnderflow)?;
                             frame.ip = ((frame.ip as i32 - 1) + offset) as usize;
                         }
                     } else {
@@ -493,7 +488,12 @@ impl VM {
 
                 Opcode::Call => {
                     if let Some(Operand::Count(arg_count)) = inst_operands.first() {
-                        let mut args = Vec::new();
+                        // ⚡ Bolt Performance Optimization:
+                        // Pre-allocate the argument vector capacity up to the available stack size.
+                        // This avoids dynamic reallocation overhead in the hot VM loop while
+                        // preventing potential OOM panics from malformed bytecode with huge argument counts.
+                        let mut args =
+                            Vec::with_capacity((*arg_count as usize).min(self.stack.len()));
                         for _ in 0..*arg_count {
                             args.push(self.stack.pop()?);
                         }
@@ -653,7 +653,6 @@ impl VM {
 
                 Opcode::Try => {
                     if let Some(Operand::JumpOffset(offset)) = inst_operands.first() {
-                        let frame = self.frames.last_mut().ok_or(VMError::StackUnderflow)?;
                         let catch_ip = ((frame.ip as i32 - 1) + offset) as usize;
                         frame.handlers.push(ExceptionHandler {
                             catch_ip,
@@ -665,7 +664,6 @@ impl VM {
                 }
 
                 Opcode::EndTry => {
-                    let frame = self.frames.last_mut().ok_or(VMError::StackUnderflow)?;
                     frame.handlers.pop();
                 }
 
@@ -700,7 +698,11 @@ impl VM {
 
                 Opcode::MakeList => {
                     if let Some(Operand::Count(n)) = inst_operands.first() {
-                        let mut items = Vec::new();
+                        // ⚡ Bolt Performance Optimization:
+                        // Pre-allocate the list capacity up to the available stack size.
+                        // This avoids dynamic reallocation overhead in the hot VM loop while
+                        // preventing potential OOM panics from malformed bytecode with huge item counts.
+                        let mut items = Vec::with_capacity((*n as usize).min(self.stack.len()));
                         for _ in 0..*n {
                             items.push(self.stack.pop()?);
                         }
@@ -716,7 +718,14 @@ impl VM {
 
                 Opcode::MakeMap => {
                     if let Some(Operand::Count(n)) = inst_operands.first() {
-                        let mut entries = indexmap::IndexMap::new();
+                        // ⚡ Bolt Performance Optimization:
+                        // Pre-allocate the map capacity up to half the available stack size
+                        // (since each entry consumes a key and a value on the stack).
+                        // This avoids dynamic reallocation overhead in the hot VM loop while
+                        // preventing potential OOM panics from malformed bytecode with huge item counts.
+                        let mut entries = indexmap::IndexMap::with_capacity(
+                            (*n as usize).min(self.stack.len() / 2),
+                        );
                         for _ in 0..*n {
                             let val = self.stack.pop()?;
                             let key_val = self.stack.pop()?;
@@ -773,9 +782,7 @@ impl VM {
 
                 Opcode::FieldLoad => {
                     if let Some(Operand::ConstantIndex(c_idx)) = inst_operands.first() {
-                        let current_func = &self.module.functions
-                            [self.frames.last().unwrap().function_idx as usize];
-                        let lit = current_func
+                        let lit = func
                             .chunk
                             .constants
                             .get(*c_idx)
@@ -831,9 +838,7 @@ impl VM {
 
                 Opcode::FieldStore => {
                     if let Some(Operand::ConstantIndex(c_idx)) = inst_operands.first() {
-                        let current_func = &self.module.functions
-                            [self.frames.last().unwrap().function_idx as usize];
-                        let lit = current_func
+                        let lit = func
                             .chunk
                             .constants
                             .get(*c_idx)

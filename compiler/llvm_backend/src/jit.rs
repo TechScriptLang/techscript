@@ -4,12 +4,10 @@
 
 #![cfg(feature = "llvm")]
 
-use llvm_sys::core::*;
+use llvm_sys::orc2::lljit::*;
 use llvm_sys::orc2::*;
-use llvm_sys::prelude::*;
 use std::collections::HashMap;
 use std::ffi::CString;
-use std::os::raw::c_void;
 use std::ptr;
 
 use crate::codegen::CodegenEngine;
@@ -24,6 +22,9 @@ pub struct LLVMJitEngine {
 
 impl LLVMJitEngine {
     /// Creates a new LLVMJitEngine instance.
+    /// # Safety
+    ///
+    /// Caller must ensure LLVM context is valid.
     pub unsafe fn new() -> Result<Self, String> {
         let mut jit = ptr::null_mut();
         let builder = LLVMOrcCreateLLJITBuilder();
@@ -32,7 +33,7 @@ impl LLVMJitEngine {
             return Err("Failed to create LLVMOrcLLJITRef".to_string());
         }
 
-        let ts_ctx = LLVMOrcCreateThreadSafeContext();
+        let ts_ctx = LLVMOrcCreateNewThreadSafeContext();
 
         Ok(Self {
             jit,
@@ -42,10 +43,13 @@ impl LLVMJitEngine {
     }
 
     /// Compiles a TechScript IR Module to JIT memory.
+    /// # Safety
+    ///
+    /// Caller must ensure LLVM context is valid.
     pub unsafe fn compile(
         &mut self,
         ir_module: &techscript_ir::Module,
-        options: &LLVMBackendOptions,
+        _options: &LLVMBackendOptions,
     ) -> Result<(), String> {
         // 1. Build LLVM IR Module
         let mut ctx = CodegenContext::new(&ir_module.name);
@@ -54,17 +58,17 @@ impl LLVMJitEngine {
 
         // 2. Set target triple and data layout matching LLJIT
         let jd = LLVMOrcLLJITGetMainJITDylib(self.jit);
-        let layout = LLVMOrcLLJITGetDataLayout(self.jit);
-        let layout_str = LLVMCopyStringRepOfTargetData(layout);
-        LLVMSetDataLayout(ctx.module, layout_str);
-        LLVMDisposeTargetString(layout_str);
+        let layout_str = LLVMOrcLLJITGetDataLayoutStr(self.jit);
+        llvm_sys::core::LLVMSetDataLayout(ctx.module, layout_str);
+        // Do not dispose layout_str directly as LLVMOrcLLJITGetDataLayoutStr returns a borrowed const char*
+        // string tied to the DataLayout of the JIT instance.
 
         // 3. Set host target triple
-        let host_triple = LLVMOrcLLJITGetExecutionSession(self.jit); // session triple fallback
-                                                                     // We can just keep the default LLVM target triple
+        let _host_triple = LLVMOrcLLJITGetExecutionSession(self.jit); // session triple fallback
+                                                                      // We can just keep the default LLVM target triple
 
         // 4. Wrap Module in ThreadSafeModule
-        let tsm = LLVMOrcCreateThreadSafeModule(ctx.module, self.ts_ctx);
+        let tsm = LLVMOrcCreateNewThreadSafeModule(ctx.module, self.ts_ctx);
 
         // Relinquish ownership of ctx.module because LLVMOrcCreateThreadSafeModule takes it
         ctx.module = ptr::null_mut();
@@ -80,6 +84,9 @@ impl LLVMJitEngine {
     }
 
     /// Looks up a function symbol by name.
+    /// # Safety
+    ///
+    /// Caller must ensure LLVM context is valid.
     pub unsafe fn lookup(&mut self, name: &str) -> Result<u64, String> {
         if let Some(&addr) = self.cache.get(name) {
             return Ok(addr);
@@ -97,6 +104,9 @@ impl LLVMJitEngine {
     }
 
     /// Executes the JIT-compiled main function and returns its result (if integer).
+    /// # Safety
+    ///
+    /// Caller must ensure LLVM context is valid.
     pub unsafe fn execute(&mut self, func_name: &str) -> Result<i64, String> {
         let addr = self.lookup(func_name)?;
         let func: extern "C" fn() -> i64 = std::mem::transmute(addr);
@@ -104,6 +114,9 @@ impl LLVMJitEngine {
     }
 
     /// Clears the function cache and reloads the engine (for hot reload support).
+    /// # Safety
+    ///
+    /// Caller must ensure LLVM context is valid.
     pub unsafe fn hot_reload(&mut self) {
         self.cache.clear();
     }
@@ -112,7 +125,7 @@ impl LLVMJitEngine {
 impl Drop for LLVMJitEngine {
     fn drop(&mut self) {
         unsafe {
-            LLVMOrcLLJITDispose(self.jit);
+            LLVMOrcDisposeLLJIT(self.jit);
             LLVMOrcDisposeThreadSafeContext(self.ts_ctx);
         }
     }

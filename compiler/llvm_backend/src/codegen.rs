@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use techscript_ast::LiteralVal;
 use techscript_ir::types::{BlockId, GlobalId, IRType, ValueId};
-use techscript_ir::{BasicBlock, Function, Instruction, Module, Op, TerminatorKind, Value};
+use techscript_ir::{Function, Instruction, Module, Op, TerminatorKind, Value};
 use techscript_syntax::TokenKind;
 
 use crate::context::CodegenContext;
@@ -33,18 +33,21 @@ impl<'a> CodegenEngine<'a> {
         }
     }
 
+    /// # Safety
+    ///
+    /// Caller must ensure LLVM context is valid.
     pub unsafe fn compile_module(&mut self, ir_module: &Module) -> Result<(), String> {
         self.global_names.clear();
 
         // 1. Declare globals
-        for &(ref global_id, ref name, ref ty) in &ir_module.globals {
+        for (global_id, name, ty) in &ir_module.globals {
             let llvm_ty = to_llvm_type(self.ctx.context, ty);
             let global_var = LLVMAddGlobal(
                 self.ctx.module,
                 llvm_ty,
                 CString::new(name.as_str()).unwrap().as_ptr(),
             );
-            self.ctx.register_value(*global_id, global_var);
+            self.ctx.register_global(*global_id, global_var);
             self.global_names.insert(*global_id, name.clone());
         }
 
@@ -95,7 +98,7 @@ impl<'a> CodegenEngine<'a> {
         // Register function parameter variables
         for (idx, &(local_id, _, _)) in func.params.iter().enumerate() {
             let param_val = LLVMGetParam(llvm_func, idx as u32);
-            self.ctx.register_value(local_id, param_val);
+            self.ctx.register_local(local_id, param_val);
         }
 
         // Allocate basic blocks
@@ -197,6 +200,25 @@ impl<'a> CodegenEngine<'a> {
                     TerminatorKind::Unreachable => {
                         LLVMBuildUnreachable(self.ctx.builder);
                     }
+                    TerminatorKind::Throw(val) => {
+                        let thrown_val = self.codegen_val(val)?;
+                        let boxed_val = self.box_val(thrown_val)?;
+                        let i8_ptr_ty = LLVMPointerType(LLVMInt8TypeInContext(self.ctx.context), 0);
+                        let fn_throw = self.get_or_declare_runtime_fn(
+                            "ts_throw",
+                            LLVMVoidTypeInContext(self.ctx.context),
+                            &[i8_ptr_ty],
+                        );
+                        LLVMBuildCall2(
+                            self.ctx.builder,
+                            LLVMTypeOf(fn_throw),
+                            fn_throw,
+                            [boxed_val].as_mut_ptr(),
+                            1,
+                            c"".as_ptr(),
+                        );
+                        LLVMBuildUnreachable(self.ctx.builder);
+                    }
                 }
             }
         }
@@ -230,7 +252,6 @@ impl<'a> CodegenEngine<'a> {
         let i64_ty = LLVMInt64TypeInContext(context);
         let i1_ty = LLVMInt1TypeInContext(context);
         let i32_ty = LLVMInt32TypeInContext(context);
-        let double_ty = LLVMDoubleTypeInContext(context);
 
         let llvm_val = match &inst.op {
             Op::Constant(lit) => {
@@ -695,14 +716,17 @@ impl<'a> CodegenEngine<'a> {
                 // Handle direct calls to global/user/standard functions
                 let mut resolved_func = None;
                 if let Value::Global(global_id) = callee {
-                    if let Some(global_name) = self.global_names.get(global_id) {
-                        resolved_func = self.resolve_function_by_name(global_name);
+                    let name = self.global_names.get(global_id).cloned();
+                    if let Some(n) = name {
+                        resolved_func = self.resolve_function_by_name(&n);
                     }
                 } else if let Value::Temp(temp_id) = callee {
+                    let mut name = None;
                     if let Some(global_id) = self.temp_to_global.get(temp_id) {
-                        if let Some(global_name) = self.global_names.get(global_id) {
-                            resolved_func = self.resolve_function_by_name(global_name);
-                        }
+                        name = self.global_names.get(global_id).cloned();
+                    }
+                    if let Some(n) = name {
+                        resolved_func = self.resolve_function_by_name(&n);
                     }
                 }
 
@@ -1050,7 +1074,124 @@ impl<'a> CodegenEngine<'a> {
                     CString::new("cast").unwrap().as_ptr(),
                 )
             }
-            Op::NoOp => return Ok(()),
+            Op::Try {
+                catch_block,
+                catch_var,
+            } => {
+                let i8_ptr_ty = LLVMPointerType(LLVMInt8TypeInContext(context), 0);
+                let fn_push = self.get_or_declare_runtime_fn("ts_try_push", i8_ptr_ty, &[]);
+                let buf_ptr = LLVMBuildCall2(
+                    self.ctx.builder,
+                    LLVMTypeOf(fn_push),
+                    fn_push,
+                    [].as_mut_ptr(),
+                    0,
+                    CString::new("jmp_buf").unwrap().as_ptr(),
+                );
+
+                let setjmp_fn = self.get_or_declare_runtime_fn(
+                    #[cfg(target_os = "windows")]
+                    "_setjmp",
+                    #[cfg(not(target_os = "windows"))]
+                    "setjmp",
+                    i32_ty,
+                    &[i8_ptr_ty],
+                );
+
+                let res = LLVMBuildCall2(
+                    self.ctx.builder,
+                    LLVMTypeOf(setjmp_fn),
+                    setjmp_fn,
+                    [buf_ptr].as_mut_ptr(),
+                    1,
+                    CString::new("setjmp_res").unwrap().as_ptr(),
+                );
+
+                let zero = LLVMConstInt(i32_ty, 0, 0);
+                let is_exception = LLVMBuildICmp(
+                    self.ctx.builder,
+                    llvm_sys::LLVMIntPredicate::LLVMIntNE,
+                    res,
+                    zero,
+                    CString::new("is_exception").unwrap().as_ptr(),
+                );
+
+                // We need to split the block here because setjmp acts as a conditional branch point
+                let current_block = LLVMGetInsertBlock(self.ctx.builder);
+                let func = LLVMGetBasicBlockParent(current_block);
+
+                let cont_block = LLVMAppendBasicBlockInContext(
+                    context,
+                    func,
+                    CString::new("try_continue").unwrap().as_ptr(),
+                );
+
+                let catch_target = self.ctx.get_block(*catch_block).unwrap();
+
+                // We create a dispatch block for the exception path
+                let dispatch_block = LLVMAppendBasicBlockInContext(
+                    context,
+                    func,
+                    CString::new("try_dispatch").unwrap().as_ptr(),
+                );
+
+                LLVMBuildCondBr(self.ctx.builder, is_exception, dispatch_block, cont_block);
+
+                // exception path
+                LLVMPositionBuilderAtEnd(self.ctx.builder, dispatch_block);
+
+                // Clean up the jmp_buf since we arrived here via longjmp and ts_try_pop wasn't called
+                let fn_free_buf = self.get_or_declare_runtime_fn(
+                    "ts_try_free",
+                    LLVMVoidTypeInContext(context),
+                    &[i8_ptr_ty],
+                );
+                LLVMBuildCall2(
+                    self.ctx.builder,
+                    LLVMTypeOf(fn_free_buf),
+                    fn_free_buf,
+                    [buf_ptr].as_mut_ptr(),
+                    1,
+                    CString::new("").unwrap().as_ptr(),
+                );
+
+                let fn_get_ex = self.get_or_declare_runtime_fn("ts_get_exception", i8_ptr_ty, &[]);
+                let ex_val = LLVMBuildCall2(
+                    self.ctx.builder,
+                    LLVMTypeOf(fn_get_ex),
+                    fn_get_ex,
+                    [].as_mut_ptr(),
+                    0,
+                    CString::new("ex_val").unwrap().as_ptr(),
+                );
+
+                if let Some(target) = self.ctx.get_local(*catch_var) {
+                    LLVMBuildStore(self.ctx.builder, ex_val, target);
+                }
+                LLVMBuildBr(self.ctx.builder, catch_target);
+
+                // continue path
+                LLVMPositionBuilderAtEnd(self.ctx.builder, cont_block);
+
+                return Ok(());
+            }
+            Op::EndTry => {
+                let fn_pop = self.get_or_declare_runtime_fn(
+                    "ts_try_pop",
+                    LLVMVoidTypeInContext(context),
+                    &[],
+                );
+                LLVMBuildCall2(
+                    self.ctx.builder,
+                    LLVMTypeOf(fn_pop),
+                    fn_pop,
+                    [].as_mut_ptr(),
+                    0,
+                    CString::new("").unwrap().as_ptr(),
+                );
+                return Ok(());
+            }
+            Op::MakeDslBlock { .. } | Op::NoOp => return Ok(()),
         };
 
         if let Some(res_id) = inst.result {
@@ -1068,14 +1209,14 @@ impl<'a> CodegenEngine<'a> {
                 .ok_or_else(|| format!("ValueId {:?} not found", id)),
             Value::Local(id) => self
                 .ctx
-                .get_value(*id)
+                .get_local(*id)
                 .ok_or_else(|| format!("LocalId {:?} not found", id)),
             Value::Global(id) => self
                 .ctx
-                .get_value(*id)
+                .get_global(*id)
                 .ok_or_else(|| format!("GlobalId {:?} not found", id)),
             Value::Const(lit) => self.codegen_literal(lit),
-            Value::Null => Ok(LLVMConstNull(LLVMPointerType(
+            Value::Null | Value::DslBlock { .. } => Ok(LLVMConstNull(LLVMPointerType(
                 LLVMInt8TypeInContext(self.ctx.context),
                 0,
             ))),
@@ -1106,7 +1247,7 @@ impl<'a> CodegenEngine<'a> {
                     name.as_ptr(),
                 ))
             }
-            LiteralVal::Null => Ok(LLVMConstNull(LLVMPointerType(
+            LiteralVal::None => Ok(LLVMConstNull(LLVMPointerType(
                 LLVMInt8TypeInContext(self.ctx.context),
                 0,
             ))),
@@ -1274,7 +1415,7 @@ impl TypeInfo for Value {
                 LiteralVal::Float(_) => IRType::Float64,
                 LiteralVal::Bool(_) => IRType::Bool,
                 LiteralVal::Str(_) => IRType::String,
-                LiteralVal::Null => IRType::Any,
+                LiteralVal::None => IRType::Any,
             },
             _ => IRType::Any,
         }

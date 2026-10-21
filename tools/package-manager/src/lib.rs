@@ -340,8 +340,10 @@ impl CapabilityValidator {
         dep_name: &str,
     ) -> Result<()> {
         let root_set: HashSet<&String> = root_caps.iter().collect();
+        let allowed_elevations_set: HashSet<&str> =
+            allowed_elevations.iter().map(|s| s.as_str()).collect();
         for cap in dependency_caps {
-            if !root_set.contains(cap) && !allowed_elevations.contains(&dep_name.to_string()) {
+            if !root_set.contains(cap) && !allowed_elevations_set.contains(dep_name) {
                 return Err(anyhow!(
                     "Security validation failed: Dependency '{}' requests capability '{}' which is not granted to the parent package.",
                     dep_name,
@@ -410,46 +412,92 @@ pub struct DocItem {
 pub struct DocExtractor;
 
 impl DocExtractor {
+    fn extract_symbol_name(line: &str) -> Option<String> {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() <= 1 {
+            return None;
+        }
+
+        let sym_name = parts[1]
+            .split('(')
+            .next()
+            .unwrap_or("")
+            .split('{')
+            .next()
+            .unwrap_or("")
+            .split('=')
+            .next()
+            .unwrap_or("")
+            .trim();
+
+        if sym_name.is_empty() {
+            None
+        } else {
+            Some(sym_name.to_string())
+        }
+    }
+
     pub fn extract_comments(content: &str) -> Vec<DocItem> {
         let mut items = Vec::new();
         let mut active_doc = Vec::new();
 
         for line in content.lines() {
             let line = line.trim();
+
             if let Some(doc) = line.strip_prefix("///") {
                 active_doc.push(doc.trim().to_string());
-            } else if line.starts_with("function")
-                || line.starts_with("make")
-                || line.starts_with("model")
-                || line.starts_with("struct")
-            {
-                if !active_doc.is_empty() {
-                    // Extract name of symbol following keyword
-                    let parts: Vec<&str> = line.split_whitespace().collect();
-                    if parts.len() > 1 {
-                        let raw_name = parts[1];
-                        let sym_name = raw_name
-                            .split('(')
-                            .next()
-                            .unwrap()
-                            .split('{')
-                            .next()
-                            .unwrap()
-                            .split('=')
-                            .next()
-                            .unwrap()
-                            .trim();
+                continue;
+            }
+
+            if !active_doc.is_empty() {
+                if line.starts_with("function")
+                    || line.starts_with("make")
+                    || line.starts_with("model")
+                    || line.starts_with("struct")
+                {
+                    if let Some(name) = Self::extract_symbol_name(line) {
                         items.push(DocItem {
-                            name: sym_name.to_string(),
+                            name,
                             doc: active_doc.join("\n"),
                         });
                     }
-                    active_doc.clear();
                 }
-            } else {
                 active_doc.clear();
             }
         }
         items
     }
+}
+
+// =========================================================================
+// 8. Manifest File Constants & Dual Resolution Helpers
+// =========================================================================
+
+pub const WEBFORGE_MANIFEST_FILE: &str = "webforge.toml";
+pub const PRIMARY_MANIFEST_FILE: &str = "techscript.toml";
+pub const LEGACY_MANIFEST_FILE: &str = "tech.toml";
+pub const WEBFORGE_LOCKFILE_NAME: &str = "webforge.lock";
+pub const LOCKFILE_NAME: &str = "techscript.lock";
+pub const LEGACY_LOCKFILE_NAME: &str = "tech.lock";
+
+/// Resolves the manifest path in a given directory, prioritizing `webforge.toml`, then `techscript.toml`, with fallback to `tech.toml`.
+pub fn find_manifest_in(dir: &std::path::Path) -> Option<std::path::PathBuf> {
+    let webforge = dir.join(WEBFORGE_MANIFEST_FILE);
+    if webforge.exists() {
+        return Some(webforge);
+    }
+    let primary = dir.join(PRIMARY_MANIFEST_FILE);
+    if primary.exists() {
+        return Some(primary);
+    }
+    let legacy = dir.join(LEGACY_MANIFEST_FILE);
+    if legacy.exists() {
+        return Some(legacy);
+    }
+    None
+}
+
+/// Resolves or returns the default manifest path in a given directory (`webforge.toml` if none exists).
+pub fn manifest_path_in(dir: &std::path::Path) -> std::path::PathBuf {
+    find_manifest_in(dir).unwrap_or_else(|| dir.join(WEBFORGE_MANIFEST_FILE))
 }

@@ -1,6 +1,7 @@
 [package]
 name = "techscript_llvm_backend"
 version = "2.0.0"
+license = "Apache-2.0"
 edition = "2021"
 description = "TechScript 2.0 native machine compiler backend utilizing LLVM"
 
@@ -9,7 +10,7 @@ techscript_common = { path = "../common" }
 techscript_ir = { path = "../ir" }
 techscript_ast = { path = "../ast" }
 techscript_syntax = { path = "../syntax" }
-llvm-sys = { version = "221", optional = true }
+llvm-sys = { version = "231", optional = true }
 serde = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }

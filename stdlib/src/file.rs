@@ -2,7 +2,12 @@ use crate::{StdFunction, StdlibModule, StdlibRegistry};
 use std::collections::HashMap;
 use std::fs;
 use std::rc::Rc;
-use techscript_runtime::{error::RuntimeError, value::RuntimeValue};
+use techscript_runtime::{
+    context::Capability,
+    error::{RuntimeError, RuntimeErrorKind},
+    value::RuntimeValue,
+    RuntimeContext,
+};
 
 impl StdlibRegistry {
     pub fn register_file(&mut self) {
@@ -14,31 +19,7 @@ impl StdlibRegistry {
             Rc::new(StdFunction {
                 name: "read".to_string(),
                 arity: 1,
-                callback: |_ctx, args| {
-                    let path = match &args[0] {
-                        RuntimeValue::Str(s) => s.clone(),
-                        _ => {
-                            return Err(RuntimeError::new(
-                                techscript_runtime::error::RuntimeErrorKind::TypeMismatch {
-                                    expected: "string".to_string(),
-                                    found: "other".to_string(),
-                                },
-                                None,
-                                None,
-                            ))
-                        }
-                    };
-                    let content = fs::read_to_string(&path).map_err(|e| {
-                        RuntimeError::new(
-                            techscript_runtime::error::RuntimeErrorKind::InvalidOperation(
-                                e.to_string(),
-                            ),
-                            None,
-                            None,
-                        )
-                    })?;
-                    Ok(RuntimeValue::Str(content))
-                },
+                callback: file_read,
             }),
         );
 
@@ -47,44 +28,7 @@ impl StdlibRegistry {
             Rc::new(StdFunction {
                 name: "write".to_string(),
                 arity: 2,
-                callback: |_ctx, args| {
-                    let path = match &args[0] {
-                        RuntimeValue::Str(s) => s.clone(),
-                        _ => {
-                            return Err(RuntimeError::new(
-                                techscript_runtime::error::RuntimeErrorKind::TypeMismatch {
-                                    expected: "string".to_string(),
-                                    found: "other".to_string(),
-                                },
-                                None,
-                                None,
-                            ))
-                        }
-                    };
-                    let content = match &args[1] {
-                        RuntimeValue::Str(s) => s.clone(),
-                        _ => {
-                            return Err(RuntimeError::new(
-                                techscript_runtime::error::RuntimeErrorKind::TypeMismatch {
-                                    expected: "string".to_string(),
-                                    found: "other".to_string(),
-                                },
-                                None,
-                                None,
-                            ))
-                        }
-                    };
-                    fs::write(&path, &content).map_err(|e| {
-                        RuntimeError::new(
-                            techscript_runtime::error::RuntimeErrorKind::InvalidOperation(
-                                e.to_string(),
-                            ),
-                            None,
-                            None,
-                        )
-                    })?;
-                    Ok(RuntimeValue::Null)
-                },
+                callback: file_write,
             }),
         );
 
@@ -93,44 +37,7 @@ impl StdlibRegistry {
             Rc::new(StdFunction {
                 name: "copy".to_string(),
                 arity: 2,
-                callback: |_ctx, args| {
-                    let src = match &args[0] {
-                        RuntimeValue::Str(s) => s.clone(),
-                        _ => {
-                            return Err(RuntimeError::new(
-                                techscript_runtime::error::RuntimeErrorKind::TypeMismatch {
-                                    expected: "string".to_string(),
-                                    found: "other".to_string(),
-                                },
-                                None,
-                                None,
-                            ))
-                        }
-                    };
-                    let dest = match &args[1] {
-                        RuntimeValue::Str(s) => s.clone(),
-                        _ => {
-                            return Err(RuntimeError::new(
-                                techscript_runtime::error::RuntimeErrorKind::TypeMismatch {
-                                    expected: "string".to_string(),
-                                    found: "other".to_string(),
-                                },
-                                None,
-                                None,
-                            ))
-                        }
-                    };
-                    fs::copy(&src, &dest).map_err(|e| {
-                        RuntimeError::new(
-                            techscript_runtime::error::RuntimeErrorKind::InvalidOperation(
-                                e.to_string(),
-                            ),
-                            None,
-                            None,
-                        )
-                    })?;
-                    Ok(RuntimeValue::Null)
-                },
+                callback: file_copy,
             }),
         );
 
@@ -139,31 +46,7 @@ impl StdlibRegistry {
             Rc::new(StdFunction {
                 name: "remove".to_string(),
                 arity: 1,
-                callback: |_ctx, args| {
-                    let path = match &args[0] {
-                        RuntimeValue::Str(s) => s.clone(),
-                        _ => {
-                            return Err(RuntimeError::new(
-                                techscript_runtime::error::RuntimeErrorKind::TypeMismatch {
-                                    expected: "string".to_string(),
-                                    found: "other".to_string(),
-                                },
-                                None,
-                                None,
-                            ))
-                        }
-                    };
-                    fs::remove_file(&path).map_err(|e| {
-                        RuntimeError::new(
-                            techscript_runtime::error::RuntimeErrorKind::InvalidOperation(
-                                e.to_string(),
-                            ),
-                            None,
-                            None,
-                        )
-                    })?;
-                    Ok(RuntimeValue::Null)
-                },
+                callback: file_remove,
             }),
         );
 
@@ -172,22 +55,7 @@ impl StdlibRegistry {
             Rc::new(StdFunction {
                 name: "exists".to_string(),
                 arity: 1,
-                callback: |_ctx, args| {
-                    let path = match &args[0] {
-                        RuntimeValue::Str(s) => s.clone(),
-                        _ => {
-                            return Err(RuntimeError::new(
-                                techscript_runtime::error::RuntimeErrorKind::TypeMismatch {
-                                    expected: "string".to_string(),
-                                    found: "other".to_string(),
-                                },
-                                None,
-                                None,
-                            ))
-                        }
-                    };
-                    Ok(RuntimeValue::Bool(std::path::Path::new(&path).exists()))
-                },
+                callback: file_exists,
             }),
         );
 
@@ -197,8 +65,207 @@ impl StdlibRegistry {
                 name: "std.file".to_string(),
                 version: "1.0.0".to_string(),
                 exports,
-                required_capabilities: Vec::new(),
+                required_capabilities: vec![Capability::FileSystem],
             },
         );
     }
+}
+
+fn file_read(
+    ctx: &mut RuntimeContext,
+    args: Vec<RuntimeValue>,
+) -> Result<RuntimeValue, RuntimeError> {
+    if !ctx.config.capabilities.contains(&Capability::FileSystem) {
+        return Err(RuntimeError::new(
+            RuntimeErrorKind::InvalidOperation(
+                "Security policy violation: FileSystem capability is denied".to_string(),
+            ),
+            None,
+            None,
+        ));
+    }
+    let path = match &args[0] {
+        RuntimeValue::Str(s) => s.clone(),
+        _ => {
+            return Err(RuntimeError::new(
+                RuntimeErrorKind::TypeMismatch {
+                    expected: "string".to_string(),
+                    found: "other".to_string(),
+                },
+                None,
+                None,
+            ))
+        }
+    };
+    let content = fs::read_to_string(&path).map_err(|e| {
+        RuntimeError::new(
+            RuntimeErrorKind::InvalidOperation(e.to_string()),
+            None,
+            None,
+        )
+    })?;
+    Ok(RuntimeValue::Str(content))
+}
+
+fn file_write(
+    ctx: &mut RuntimeContext,
+    args: Vec<RuntimeValue>,
+) -> Result<RuntimeValue, RuntimeError> {
+    if !ctx.config.capabilities.contains(&Capability::FileSystem) {
+        return Err(RuntimeError::new(
+            RuntimeErrorKind::InvalidOperation(
+                "Security policy violation: FileSystem capability is denied".to_string(),
+            ),
+            None,
+            None,
+        ));
+    }
+    let path = match &args[0] {
+        RuntimeValue::Str(s) => s.clone(),
+        _ => {
+            return Err(RuntimeError::new(
+                RuntimeErrorKind::TypeMismatch {
+                    expected: "string".to_string(),
+                    found: "other".to_string(),
+                },
+                None,
+                None,
+            ))
+        }
+    };
+    let content = match &args[1] {
+        RuntimeValue::Str(s) => s.clone(),
+        _ => {
+            return Err(RuntimeError::new(
+                RuntimeErrorKind::TypeMismatch {
+                    expected: "string".to_string(),
+                    found: "other".to_string(),
+                },
+                None,
+                None,
+            ))
+        }
+    };
+    fs::write(&path, &content).map_err(|e| {
+        RuntimeError::new(
+            RuntimeErrorKind::InvalidOperation(e.to_string()),
+            None,
+            None,
+        )
+    })?;
+    Ok(RuntimeValue::Null)
+}
+
+fn file_copy(
+    ctx: &mut RuntimeContext,
+    args: Vec<RuntimeValue>,
+) -> Result<RuntimeValue, RuntimeError> {
+    if !ctx.config.capabilities.contains(&Capability::FileSystem) {
+        return Err(RuntimeError::new(
+            RuntimeErrorKind::InvalidOperation(
+                "Security policy violation: FileSystem capability is denied".to_string(),
+            ),
+            None,
+            None,
+        ));
+    }
+    let src = match &args[0] {
+        RuntimeValue::Str(s) => s.clone(),
+        _ => {
+            return Err(RuntimeError::new(
+                RuntimeErrorKind::TypeMismatch {
+                    expected: "string".to_string(),
+                    found: "other".to_string(),
+                },
+                None,
+                None,
+            ))
+        }
+    };
+    let dest = match &args[1] {
+        RuntimeValue::Str(s) => s.clone(),
+        _ => {
+            return Err(RuntimeError::new(
+                RuntimeErrorKind::TypeMismatch {
+                    expected: "string".to_string(),
+                    found: "other".to_string(),
+                },
+                None,
+                None,
+            ))
+        }
+    };
+    fs::copy(&src, &dest).map_err(|e| {
+        RuntimeError::new(
+            RuntimeErrorKind::InvalidOperation(e.to_string()),
+            None,
+            None,
+        )
+    })?;
+    Ok(RuntimeValue::Null)
+}
+
+fn file_remove(
+    ctx: &mut RuntimeContext,
+    args: Vec<RuntimeValue>,
+) -> Result<RuntimeValue, RuntimeError> {
+    if !ctx.config.capabilities.contains(&Capability::FileSystem) {
+        return Err(RuntimeError::new(
+            RuntimeErrorKind::InvalidOperation(
+                "Security policy violation: FileSystem capability is denied".to_string(),
+            ),
+            None,
+            None,
+        ));
+    }
+    let path = match &args[0] {
+        RuntimeValue::Str(s) => s.clone(),
+        _ => {
+            return Err(RuntimeError::new(
+                RuntimeErrorKind::TypeMismatch {
+                    expected: "string".to_string(),
+                    found: "other".to_string(),
+                },
+                None,
+                None,
+            ))
+        }
+    };
+    fs::remove_file(&path).map_err(|e| {
+        RuntimeError::new(
+            RuntimeErrorKind::InvalidOperation(e.to_string()),
+            None,
+            None,
+        )
+    })?;
+    Ok(RuntimeValue::Null)
+}
+
+fn file_exists(
+    ctx: &mut RuntimeContext,
+    args: Vec<RuntimeValue>,
+) -> Result<RuntimeValue, RuntimeError> {
+    if !ctx.config.capabilities.contains(&Capability::FileSystem) {
+        return Err(RuntimeError::new(
+            RuntimeErrorKind::InvalidOperation(
+                "Security policy violation: FileSystem capability is denied".to_string(),
+            ),
+            None,
+            None,
+        ));
+    }
+    let path = match &args[0] {
+        RuntimeValue::Str(s) => s.clone(),
+        _ => {
+            return Err(RuntimeError::new(
+                RuntimeErrorKind::TypeMismatch {
+                    expected: "string".to_string(),
+                    found: "other".to_string(),
+                },
+                None,
+                None,
+            ))
+        }
+    };
+    Ok(RuntimeValue::Bool(std::path::Path::new(&path).exists()))
 }

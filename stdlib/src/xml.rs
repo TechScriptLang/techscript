@@ -2,6 +2,7 @@ use crate::{StdFunction, StdlibModule, StdlibRegistry};
 use indexmap::IndexMap;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::rc::Rc;
 use techscript_runtime::{error::RuntimeError, value::RuntimeValue};
 
@@ -18,12 +19,14 @@ impl StdlibRegistry {
                 callback: |_ctx, args| {
                     let xml = args[0].try_into_string()?;
                     let mut map = IndexMap::new();
-                    if xml.starts_with('<') && xml.contains('>') {
-                        let tag_name = xml[1..xml.find('>').unwrap_or(1)].to_string();
-                        let close_tag = format!("</{}>", tag_name);
-                        if let Some(close_pos) = xml.find(&close_tag) {
-                            let content = xml[xml.find('>').unwrap() + 1..close_pos].to_string();
-                            map.insert(tag_name, RuntimeValue::Str(content));
+                    if xml.starts_with('<') {
+                        if let Some(gt_pos) = xml.find('>') {
+                            let tag_name = xml[1..gt_pos].to_string();
+                            let close_tag = format!("</{}>", tag_name);
+                            if let Some(close_pos) = xml.find(&close_tag) {
+                                let content = xml[gt_pos + 1..close_pos].to_string();
+                                map.insert(tag_name, RuntimeValue::Str(content));
+                            }
                         }
                     }
                     Ok(RuntimeValue::Map {
@@ -44,7 +47,7 @@ impl StdlibRegistry {
                     if let RuntimeValue::Map { entries, .. } = &args[0] {
                         for (k, v) in entries.borrow().iter() {
                             let val_str = v.try_into_string().unwrap_or_default();
-                            result.push_str(&format!("<{}>{}</{}>", k, val_str, k));
+                            let _ = write!(result, "<{}>{}</{}>", k, val_str, k);
                         }
                     }
                     Ok(RuntimeValue::Str(result))

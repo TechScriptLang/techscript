@@ -9,6 +9,9 @@ use llvm_sys::prelude::*;
 use techscript_ir::types::IRType;
 
 /// Maps a TechScript IRType to its corresponding LLVMTypeRef.
+/// # Safety
+///
+/// Caller must ensure LLVM context is valid.
 pub unsafe fn to_llvm_type(context: LLVMContextRef, ty: &IRType) -> LLVMTypeRef {
     match ty {
         IRType::Void => LLVMVoidTypeInContext(context),
@@ -25,6 +28,7 @@ pub unsafe fn to_llvm_type(context: LLVMContextRef, ty: &IRType) -> LLVMTypeRef 
         IRType::Struct(_) => LLVMPointerType(LLVMInt8TypeInContext(context), 0),
         IRType::Enum(_) => LLVMPointerType(LLVMInt8TypeInContext(context), 0),
         IRType::Model(_) => LLVMPointerType(LLVMInt8TypeInContext(context), 0),
+        IRType::DslBlock(_) => LLVMPointerType(LLVMInt8TypeInContext(context), 0),
         IRType::Any => LLVMPointerType(LLVMInt8TypeInContext(context), 0),
     }
 }

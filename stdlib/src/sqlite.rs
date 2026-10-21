@@ -12,6 +12,33 @@ thread_local! {
 
 static NEXT_ID: AtomicI64 = AtomicI64::new(1);
 
+struct SqlParam<'a>(&'a RuntimeValue);
+
+impl<'a> rusqlite::types::ToSql for SqlParam<'a> {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        match self.0 {
+            RuntimeValue::Null => Ok(rusqlite::types::ToSqlOutput::Borrowed(
+                rusqlite::types::ValueRef::Null,
+            )),
+            RuntimeValue::Bool(b) => Ok(rusqlite::types::ToSqlOutput::Borrowed(
+                rusqlite::types::ValueRef::Integer(if *b { 1 } else { 0 }),
+            )),
+            RuntimeValue::Int(i) => Ok(rusqlite::types::ToSqlOutput::Borrowed(
+                rusqlite::types::ValueRef::Integer(*i),
+            )),
+            RuntimeValue::Float(f) => Ok(rusqlite::types::ToSqlOutput::Borrowed(
+                rusqlite::types::ValueRef::Real(*f),
+            )),
+            RuntimeValue::Str(s) => Ok(rusqlite::types::ToSqlOutput::Borrowed(
+                rusqlite::types::ValueRef::Text(s.as_bytes()),
+            )),
+            _ => Ok(rusqlite::types::ToSqlOutput::Owned(
+                rusqlite::types::Value::Text(self.0.to_string()),
+            )),
+        }
+    }
+}
+
 impl StdlibRegistry {
     pub fn register_sqlite(&mut self) {
         let mut exports: HashMap<String, Rc<dyn techscript_runtime::function::Callable>> =
@@ -52,17 +79,43 @@ impl StdlibRegistry {
                         )
                     })?;
                     let sql = args[1].to_string();
+                    let _items_borrow;
+                    let params: Vec<SqlParam> = if let Some(arg) = args.get(2) {
+                        if let RuntimeValue::List { items, .. } = arg {
+                            _items_borrow = items.borrow();
+                            _items_borrow.iter().map(SqlParam).collect()
+                        } else {
+                            return Err(RuntimeError::new(
+                                RuntimeErrorKind::TypeMismatch {
+                                    expected: "list".to_string(),
+                                    found: arg.runtime_type().to_string(),
+                                },
+                                None,
+                                None,
+                            ));
+                        }
+                    } else {
+                        Vec::new()
+                    };
 
                     CONNECTIONS.with(|m| {
                         let mut map = m.borrow_mut();
                         if let Some(conn) = map.get_mut(&id) {
-                            conn.execute(&sql, []).map_err(|e| {
+                            let mut stmt = conn.prepare_cached(&sql).map_err(|e| {
                                 RuntimeError::new(
                                     RuntimeErrorKind::InvalidOperation(e.to_string()),
                                     None,
                                     None,
                                 )
                             })?;
+                            stmt.execute(rusqlite::params_from_iter(params))
+                                .map_err(|e| {
+                                    RuntimeError::new(
+                                        RuntimeErrorKind::InvalidOperation(e.to_string()),
+                                        None,
+                                        None,
+                                    )
+                                })?;
                             Ok(())
                         } else {
                             Err(RuntimeError::new(
@@ -93,11 +146,29 @@ impl StdlibRegistry {
                         )
                     })?;
                     let sql = args[1].to_string();
+                    let _items_borrow;
+                    let params: Vec<SqlParam> = if let Some(arg) = args.get(2) {
+                        if let RuntimeValue::List { items, .. } = arg {
+                            _items_borrow = items.borrow();
+                            _items_borrow.iter().map(SqlParam).collect()
+                        } else {
+                            return Err(RuntimeError::new(
+                                RuntimeErrorKind::TypeMismatch {
+                                    expected: "list".to_string(),
+                                    found: arg.runtime_type().to_string(),
+                                },
+                                None,
+                                None,
+                            ));
+                        }
+                    } else {
+                        Vec::new()
+                    };
 
                     let rows = CONNECTIONS.with(|m| {
                         let mut map = m.borrow_mut();
                         if let Some(conn) = map.get_mut(&id) {
-                            let mut stmt = conn.prepare(&sql).map_err(|e| {
+                            let mut stmt = conn.prepare_cached(&sql).map_err(|e| {
                                 RuntimeError::new(
                                     RuntimeErrorKind::InvalidOperation(e.to_string()),
                                     None,
@@ -108,15 +179,43 @@ impl StdlibRegistry {
                             let col_names: Vec<String> = (0..col_count)
                                 .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
                                 .collect();
+
                             let mut rows = Vec::new();
+
+                            let mut template = IndexMap::with_capacity(col_count);
+                            for name in &col_names {
+                                template.insert(name.clone(), RuntimeValue::Null);
+                            }
+
                             let row_iter = stmt
-                                .query_map([], |row| {
-                                    let mut map = IndexMap::new();
+                                .query_map(rusqlite::params_from_iter(params), |row| {
+                                    let mut map = template.clone();
                                     for i in 0..col_count {
-                                        let name = col_names[i].clone();
-                                        let val: String =
-                                            row.get::<_, String>(i).unwrap_or_default();
-                                        map.insert(name, RuntimeValue::Str(val));
+                                        let val = row.get_ref_unwrap(i);
+                                        let rt_val = match val {
+                                            rusqlite::types::ValueRef::Null => RuntimeValue::Null,
+                                            rusqlite::types::ValueRef::Integer(v) => {
+                                                RuntimeValue::Int(v)
+                                            }
+                                            rusqlite::types::ValueRef::Real(v) => {
+                                                RuntimeValue::Float(v)
+                                            }
+                                            rusqlite::types::ValueRef::Text(v) => {
+                                                RuntimeValue::Str(
+                                                    std::str::from_utf8(v)
+                                                        .unwrap_or_default()
+                                                        .to_string(),
+                                                )
+                                            }
+                                            rusqlite::types::ValueRef::Blob(v) => {
+                                                RuntimeValue::Str(
+                                                    String::from_utf8_lossy(v).into_owned(),
+                                                )
+                                            }
+                                        };
+                                        if let Some((_, v)) = map.get_index_mut(i) {
+                                            *v = rt_val;
+                                        }
                                     }
                                     Ok(map)
                                 })

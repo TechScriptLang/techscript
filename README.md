@@ -1,415 +1,596 @@
-<!-- SEO: TechScript — Plain English programming language, Rust compiler, bytecode VM, LLVM backend, open source, developer tools, compiler design, virtual machine design -->
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Tcode-Motion/techscript/main/assets/techscript-logo.png" alt="TechScript Logo" width="240">
+</p>
 
-<div align="center">
+<h1 align="center">TechScript</h1>
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0d2b0a,30:0f1a0a,65:0a0a0f,100:0DF28B&height=220&section=header&text=🐉%20TechScript&fontSize=68&fontColor=0DF28B&animation=fadeIn&fontAlignY=42&desc=Write%20like%20a%20Human.%20Run%20like%20Rust.&descAlignY=65&descColor=a7f3d0&descSize=14" width="100%"/>
+<p align="center">
+  <strong>The Modern, Human-Readable Programming Language & WebForge Full-Stack Toolchain</strong>
+</p>
 
-<br/>
-<img src="assets/techscript-logo.png" alt="TechScript Logo" width="150"/>
-<br/>
+<p align="center">
+  <a href="https://github.com/Tcode-Motion/techscript/releases"><img src="https://img.shields.io/github/v/release/Tcode-Motion/techscript?color=06B6D4&label=release&logo=github&style=for-the-badge" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-0284C7.svg?style=for-the-badge" alt="License"></a>
+  <a href="https://github.com/Tcode-Motion/techscript/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Tcode-Motion/techscript/ci.yml?branch=main&label=CI&logo=github-actions&style=for-the-badge" alt="CI Status"></a>
+  <a href="https://is-a.dev/techscript/"><img src="https://img.shields.io/badge/docs-is--a.dev%2Ftechscript-14B8A6?logo=gitbook&style=for-the-badge" alt="Documentation"></a>
+  <a href="#installation"><img src="https://img.shields.io/badge/dependencies-Zero%20(Standalone)-22C55E?style=for-the-badge" alt="Zero Dependencies"></a>
+</p>
 
-# TechScript 2.0
-
-**The plain-English programming language. Zero symbols. Zero overhead.**
-
-**Author:** Tcode-Motion
-
-> **Status:** Pre-release / Under Development. Architecture modules are currently being built and tested.
-
-[![Build Status](https://img.shields.io/github/actions/workflow/status/Tcode-Motion/techscript/build.yml?branch=main&style=for-the-badge&logo=github&label=Build)](https://github.com/Tcode-Motion/techscript/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-059669?style=for-the-badge&logo=license)](LICENSE)
-[![Latest Release](https://img.shields.io/github/v/release/Tcode-Motion/techscript?style=for-the-badge&color=0DF28B&label=Release)](https://github.com/Tcode-Motion/techscript/releases)
-[![Downloads](https://img.shields.io/github/downloads/Tcode-Motion/techscript/total?style=for-the-badge&color=00A3FF&logo=windows&label=Downloads)](https://github.com/Tcode-Motion/techscript/releases)
-[![Built with Rust](https://img.shields.io/badge/built%20in-Rust-D8B4FE?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=tanmoy.techscript)
-[![Open VSX](https://img.shields.io/badge/Open%20VSX-Extension-purple?style=for-the-badge)](https://open-vsx.org/extension/Tcode-Motion/techscript)
-[![PyPI](https://img.shields.io/pypi/v/techscript?style=for-the-badge&color=0DF28B&logo=pypi&logoColor=white)](https://pypi.org/project/techscript/)
-[![Documentation](https://img.shields.io/badge/Docs-Read-059669?style=for-the-badge)](docs/index.md)
-
-</div>
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android-475569?style=flat-square" alt="Platforms">
+  <a href="https://github.com/Tcode-Motion/techscript/stargazers"><img src="https://img.shields.io/github/stars/Tcode-Motion/techscript?style=flat-square&logo=github" alt="Stars"></a>
+  <a href="https://github.com/Tcode-Motion/techscript/network/members"><img src="https://img.shields.io/github/forks/Tcode-Motion/techscript?style=flat-square&logo=github" alt="Forks"></a>
+  <a href="https://github.com/Tcode-Motion/techscript/issues"><img src="https://img.shields.io/github/issues/Tcode-Motion/techscript?style=flat-square" alt="Issues"></a>
+  <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" alt="PRs Welcome"></a>
+  <img src="https://img.shields.io/github/languages/code-size/Tcode-Motion/techscript?style=flat-square" alt="Code Size">
+</p>
 
 ---
 
-## 📌 Table of Contents
-1. [What is TechScript?](#-what-is-techscript)
-2. [Why Choose It?](#-why-choose-it)
-3. [Key Differentiators](#-key-differentiators)
-4. [Syntax at a Glance](#-syntax-at-a-glance)
-5. [Architecture Design](#-architecture-design)
-6. [Installation](#-installation)
-7. [Quick Start](#-quick-start)
-8. [Language Guide](#-language-guide)
-9. [Standard Library & Modules](#-standard-library--modules)
-10. [CLI Commands](#-cli-commands)
-11. [Examples](#-examples)
-12. [Editor & IDE Support](#-editor--ide-support)
-13. [Documentation Portal](#-documentation-portal)
-14. [Roadmap](#-roadmap)
-15. [Repo Structure](#-repo-structure)
-16. [Contributing](#-contributing)
-17. [Links & Social Media](#-links--social-media)
-18. [License](#-license)
+## Table of Contents
+
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Standalone Architecture](#standalone-architecture--zero-rustcargo-dependency)
+- [WebForge Framework Deep-Dive](#webforge-framework-deep-dive)
+  - [Framework Architecture](#framework-architecture)
+  - [Reactive Data & Navigation Flow](#reactive-data--navigation-flow)
+  - [Scaffolding a Website](#scaffolding-a-website)
+  - [Declarative UI Components](#declarative-ui-components)
+  - [SQLite Database & Reactive State](#sqlite-database--reactive-state)
+  - [Native 3D WebGL Engine](#native-3d-webgl-engine)
+  - [Adaptive Design System](#adaptive-design-system-light--dark)
+- [Language Guide & Code Examples](#language-guide--code-examples)
+  - [Variables & Control Flow](#variables--control-flow)
+  - [Functions & Returns](#functions--returns)
+  - [Object-Oriented Programming](#object-oriented-programming)
+  - [Structs, Enums & Pattern Matching](#structs-enums--pattern-matching)
+  - [Async, Concurrency & Parallelism](#async-concurrency--parallelism)
+- [Standard Library](#standard-library)
+- [Architecture & Toolchain Flowcharts](#architecture--toolchain-flowcharts)
+  - [Compiler & Lowering Pipeline](#compiler--lowering-pipeline)
+  - [Runtime & Execution Backends](#runtime--execution-backends)
+- [Installation](#installation)
+- [CLI Reference](#cli-reference)
+- [Project Templates](#project-templates)
+- [Contributing & Policies](#contributing--policies)
+- [License](#license)
 
 ---
 
-## 📖 What is TechScript?
+## Overview
 
-**TechScript** is a general-purpose, human-first programming language designed to eliminate the syntax clutter of traditional coding. Instead of curly braces, semicolons, and cryptic operator symbols, TechScript uses a clean, keyword-based English grammar. 
+**TechScript** (`.txs`) is a modern, strongly-typed programming language engineered for human clarity, expressive readability, and high performance. By replacing punctuation-heavy bracket syntax with explicit, natural English keywords (`do`, `when`, `else`, `loop`, `repeat`, `try`, `catch`, `end`), TechScript eliminates syntax fatigue while preserving the full power of modern systems: static typing, object-oriented abstractions, concurrency, pattern matching, and native compilation.
 
-Under the hood, TechScript is built in **Rust** for safety and speed. It compiles source files into highly optimized bytecode executed on a custom stack-based Virtual Machine (VM) with NaN-boxed values and a tracing garbage collector, or can generate native code via an LLVM backend.
+TechScript ships with **WebForge**, an integrated full-stack web framework that allows developers to build responsive websites, declarative single-page applications, reactive database backends, and zero-dependency WebGL 3D experiences directly in TechScript.
 
----
+```txs
+// app.txs — A complete interactive website in TechScript
+make a website called "MyStudio"
 
-## ⚡ Why Choose It?
+header:
+    title is "MyStudio"
+    nav:
+        link:
+            label is "Home"
+            url is "/"
+        link:
+            label is "Docs"
+            url is "https://is-a.dev/techscript/"
 
-- **Zero Clutter**: Replace symbols like `{`, `}`, `(`, `)`, `;`, `&&`, and `||` with clear keywords like `do`, `end`, `when`, `else`, `and`, and `or`.
-- **Ecosystem Ready**: Runs everywhere (Windows, Linux, macOS, Android/Termux) and comes with full LSP support, linting, formatting, and packaging.
-- **Top Performance**: Powered by a custom stack-based VM written in Rust. Features compile-time constant folding and AST simplifications.
-
----
-
-## 📦 Key Differentiators
-
-| Traditional Languages | TechScript's Answer | Benefit |
-|---|---|---|
-| Syntax clutter (`{}`, `()`, `;`) | Plain-English block keywords (`do`/`end`, `when`) | Fewer syntax errors and high readability |
-| Bloated build dependency chains | Single toolchain executable (`tsc`) | Instant setups with formatting & testing |
-| Heavy memory overhead | Lightweight custom NaN-boxed stack VM | High performance and small footprint |
-
----
-
-## ✒️ Syntax at a Glance
-
-Here is a side-by-side comparison of TechScript 2.0 with JavaScript and Python:
-
-| Feature | TechScript | JavaScript | Python |
-|---|---|---|---|
-| **Variable** | `x = 10` | `let x = 10;` | `x = 10` |
-| **Constant** | `const PI = 3.14159` | `const PI = 3.14159;` | `PI = 3.14159` *(convention)* |
-| **Function** | `do greet(name)`<br>&nbsp;&nbsp;&nbsp;&nbsp;`send "Hi " + name`<br>`end` | `function greet(name) {`<br>&nbsp;&nbsp;&nbsp;&nbsp;`return "Hi " + name;`<br>`}` | `def greet(name):`<br>&nbsp;&nbsp;&nbsp;&nbsp;`return "Hi " + name` |
-| **Condition** | `when x > 5`<br>&nbsp;&nbsp;&nbsp;&nbsp;`say "Big"`<br>`else`<br>&nbsp;&nbsp;&nbsp;&nbsp;`say "Small"`<br>`end` | `if (x > 5) {`<br>&nbsp;&nbsp;&nbsp;&nbsp;`console.log("Big");`<br>`} else {`<br>&nbsp;&nbsp;&nbsp;&nbsp;`console.log("Small");`<br>`}` | `if x > 5:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`print("Big")`<br>`else:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`print("Small")` |
-| **For Loop** | `for x in list`<br>&nbsp;&nbsp;&nbsp;&nbsp;`say x`<br>`end` | `for (let x of list) {`<br>&nbsp;&nbsp;&nbsp;&nbsp;`console.log(x);`<br>`}` | `for x in list:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`print(x)` |
-| **Try / Catch** | `try`<br>&nbsp;&nbsp;&nbsp;&nbsp;`res = divide(10, 0)`<br>`catch error`<br>&nbsp;&nbsp;&nbsp;&nbsp;`say error`<br>`end` | `try {`<br>&nbsp;&nbsp;&nbsp;&nbsp;`let res = divide(10, 0);`<br>`} catch (error) {`<br>&nbsp;&nbsp;&nbsp;&nbsp;`console.error(error);`<br>`}` | `try:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`res = divide(10, 0)`<br>`except Exception as error:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`print(error)` |
+start website
+```
 
 ---
 
-## 📐 Architecture Design
+## Key Features
 
-The TechScript compiler driver (`tsc`) processes source files through a strict pipeline:
+- **Expressive English Syntax**: Structured keywords (`do`, `end`, `when`, `repeat`, `send`) make code read like clean architecture descriptions.
+- **Unified Toolchain (`tsc`)**: Single CLI driver for running, building, testing, formatting, linting, package management, and serving.
+- **Standalone Independence**: Pre-compiled single executable. **No Rust, Cargo, or external compilers are required** on the user's machine.
+- **WebForge Full-Stack Engine**: Scaffolds, runs, and compiles complete web applications with client-side SPA routing, SQLite persistence, and 3D WebGL scenes.
+- **Adaptive Design System**: Built-in glassmorphism styling, curated typography (Outfit, Inter, JetBrains Mono), responsive grids, and instant light/dark theme toggling.
+- **Multi-Backend Runtime**: Fast bytecode compiler with a register-and-stack VM for development, and native compilation for production deployments.
+- **Batteries Included**: Comprehensive standard library covering filesystem, networking, HTTP servers, cryptography, databases, JSON/CSV/YAML parsing, and 2D canvas drawing.
+
+---
+
+## Standalone Architecture — Zero Rust/Cargo Dependency
+
+TechScript is designed to be completely independent:
+- **No Rust or Cargo Required**: End users and web developers never need Rust or build tools installed on their machine.
+- **Self-Contained Executable**: The `tsc` binary (as well as `webforge` and `techscript`) contains the entire lexer, Pratt parser, semantic analyzer, optimizer, bytecode VM, WebForge server, and packager.
+- **Direct OS Integration**: Compiles directly against native OS libraries (`kernel32.dll`, `libc`). Portable zip archives and one-line installers are available for Windows, macOS, Linux, and Android (Termux).
+
+---
+
+## WebForge Framework Deep-Dive
+
+WebForge is the official full-stack web framework built directly into TechScript. It bridges high-level declarative UI composition with backend persistence and client rendering.
+
+### Framework Architecture
 
 ```mermaid
-graph TD
-    A[Source Code .txs] --> B[Logos-based Lexer]
-    B --> C[Pratt expression Parser]
-    C --> D[Abstract Syntax Tree AST]
-    D --> E[Semantic Analysis & Scope Audit]
-    E --> F[AST Optimizer & Constant Folder]
-    F --> G[IR Crate Generation]
-    G --> H{Execution Target}
-    H -->|VM Target| I[Bytecode Compiler]
-    H -->|Native Target| J[LLVM Backend Crate]
-    I --> K[Bytecode Format .txc]
-    K --> L[Stack VM & Tracing GC]
-    J --> M[Standalone Native Executable]
+flowchart TD
+    subgraph Client ["Client Browser Runtime"]
+        DOM["DOM Page Views (.webforge-page-view)"]
+        Router["Virtual SPA Router (webforgeRouter)"]
+        Theme["Theme Controller (Light & Dark)"]
+        Canvas3D["WebGL 3D Engine (Procedural Shaders)"]
+        
+        DOM <--> Router
+        DOM <--> Theme
+        DOM <--> Canvas3D
+    end
+
+    subgraph Toolchain ["WebForge Toolchain (tsc dev & build)"]
+        DSLCompiler["WebForge DSL Compiler"]
+        Server["Live HTTP Server (Port 3000..3020)"]
+        SQLite["SQLite Embedded Persistence (webforge.db)"]
+        Packager["Static Bundle Exporter (dist/)"]
+        
+        DSLCompiler --> Server
+        DSLCompiler --> Packager
+        Server <--> SQLite
+    end
+
+    Server <-->|"HTTP, REST & Hot-Reload"| Router
+    Packager -.->|"Compiles Static Bundle"| DOM
 ```
 
-*The `tsc` driver tokenizes the program, builds an AST, checks lexical scopes and types, runs constant folding, and compiles the result into bytecode for the VM or leverages LLVM to emit native machine code.*
+#### Reactive Data & Navigation Flow
+
+```mermaid
+flowchart LR
+    Event["User Click / Navigation"] --> Router["SPA Virtual Router"]
+    Router --> View["Render Page View (.txs)"]
+    Router --> Action["Execute Backend Action"]
+    Action --> DB[("SQLite Database")]
+    DB --> State["Reactive State Propagation"]
+    State --> View
+    View --> Theme["Apply Theme Tokens (Light / Dark)"]
+```
+
+
+### Scaffolding a Website
+
+Create a production-ready website with a single command:
+
+```bash
+tsc new website my-site
+cd my-site
+tsc dev
+```
+
+The WebForge live development server starts instantly on `http://localhost:3000` (with automatic port scanning if occupied) featuring live hot-reload.
+
+### Declarative UI Components
+
+WebForge projects structure user interfaces into modular `.txs` files:
+
+#### 1. Entrypoint (`app.txs`)
+```txs
+make a website called "Acme Cloud"
+
+header:
+    title is "Acme Cloud"
+    nav:
+        link:
+            label is "Home"
+            url is "/"
+        link:
+            label is "About"
+            url is "/about"
+        link:
+            label is "Docs"
+            url is "https://is-a.dev/techscript/"
+
+footer:
+    section:
+        title is "Product"
+        link:
+            label is "Features"
+            url is "/"
+        link:
+            label is "About"
+            url is "/about"
+    section:
+        title is "Resources"
+        link:
+            label is "Documentation"
+            url is "https://is-a.dev/techscript/"
+        link:
+            label is "GitHub"
+            url is "https://github.com/Tcode-Motion/techscript"
+
+start website
+```
+
+#### 2. Pages (`pages/home.txs`)
+```txs
+page Home "/":
+    hero:
+        title is "Enterprise Cloud Storage"
+        subtitle is "Fast, secure, and decentralized cloud infrastructure powered by TechScript WebForge."
+        button "Get Started" -> open "https://is-a.dev/techscript/"
+        button "Learn More" -> open "/about"
+
+    section:
+        title is "Core Infrastructure"
+        card:
+            title is "Global CDN"
+            badge is "Edge"
+            text is "Sub-millisecond static and dynamic asset delivery across 240 global edge regions."
+        card:
+            title is "Zero-Knowledge Encryption"
+            badge is "Security"
+            text is "End-to-end cryptographic proofs ensuring data sovereignty and privacy."
+        card:
+            title is "Real-Time Sync"
+            badge is "Database"
+            text is "Native SQLite multi-master replication with built-in reactive subscriptions."
+```
+
+### SQLite Database & Reactive State
+
+WebForge embeds a zero-configuration SQLite database engine. Declare schemas, tables, and query data directly in TechScript:
+
+```txs
+database "inventory_db"
+
+table "products":
+    column "id" is integer primary key autoincrement
+    column "name" is text not null
+    column "price" is real
+    column "stock" is integer
+
+action "add_product":
+    insert into "products" (name, price, stock) values ("Cloud VPS", 19.99, 50)
+```
+
+### Native 3D WebGL Engine
+
+WebForge features a lightweight, zero-dependency procedural 3D WebGL engine for interactive product showcases:
+
+```txs
+scene3d "cube_showcase":
+    mesh "cube":
+        geometry is "box"
+        color is "#0284C7"
+        roughness is 0.2
+        metalness is 0.8
+        rotate x is 0.5 y is 1.0
+
+    camera:
+        position is [0, 2, 5]
+        orbit is true
+
+    light:
+        type is "directional"
+        intensity is 1.5
+```
+
+### Adaptive Design System (Light & Dark)
+
+WebForge components are styled with an adaptive design system:
+- **Clean Light Mode (Default)**: Modern slate surfaces (`#F8FAFC`, `#FFFFFF`), crisp borders (`#E2E8F0`), vibrant tech accents (`#0284C7`), and legible typography.
+- **Sleek Cyber Dark Mode**: Deep obsidian backgrounds (`#08090E`), elevated glassmorphic panels (`#10141D`), and radiant cyan glows.
+- **One-Click Theme Toggle**: Persistent client-side theme switcher built into the navigation header.
 
 ---
 
-## 📦 Installation
+## Language Guide & Code Examples
 
-### 1. 🪟 Windows Setup
-1. Go to the [Releases](https://github.com/Tcode-Motion/techscript/releases) page on GitHub.
-2. Download **`TechScript_Setup.exe`** (or `TechScript_Portable.zip` for a zero-install portable version).
-3. Run the installer to configure your environment:
-   * Installs the native compiler (`tsc`) and VM.
-   * Automatically adds `tsc` to your system environment `PATH`.
-   * Configures file associations for `.txs` scripts.
+### Variables & Control Flow
 
-### 2. 🐧 Linux / 🍎 macOS Setup (Shell Script)
+```txs
+// Variable and constant bindings
+name = "TechScript"
+const version = 2.0
+const is_active = true
+
+// Conditional evaluation with when/else
+when version >= 2.0
+    say $"Running modern {name} v{version}"
+else
+    say "Legacy environment detected"
+end
+
+// Loops
+for number in [1, 2, 3, 4, 5]
+    say $"Index: {number}"
+end
+
+// Counted loop
+loop 3
+    say "Pinging cluster..."
+end
+
+// Condition-controlled repeat loop
+counter = 0
+repeat when counter < 3
+    counter = counter + 1
+    say $"Iteration {counter}"
+end
+```
+
+### Functions & Returns
+
+```txs
+do calculate_tax(amount, rate)
+    when rate < 0.0
+        send 0.0
+    end
+    send amount * rate
+end
+
+total = calculate_tax(100.0, 0.18)
+say $"Calculated Tax: {total}"
+```
+
+### Object-Oriented Programming
+
+```txs
+class Server
+    name = ""
+    port = 8080
+    is_running = false
+
+    do constructor(server_name, port_number)
+        name = server_name
+        port = port_number
+    end
+
+    do start()
+        is_running = true
+        say $"Server '{name}' listening on port {port}"
+    end
+
+    do stop()
+        is_running = false
+        say $"Server '{name}' stopped"
+    end
+end
+
+api = new Server("API Gateway", 3000)
+api.start()
+```
+
+### Structs, Enums & Pattern Matching
+
+```txs
+struct Point
+    x: number
+    y: number
+end
+
+enum Direction
+    North,
+    South,
+    East,
+    West
+end
+
+do step(dir)
+    match dir
+        when Direction.North
+            send "Moving forward"
+        when Direction.South
+            send "Moving backward"
+        else
+            send "Turning sideways"
+    end
+end
+```
+
+### Async, Concurrency & Parallelism
+
+```txs
+async do fetch_telemetry()
+    say "Requesting system telemetry..."
+    data = await std.http.get("https://api.example.com/status")
+    send data
+end
+
+// Parallel execution block
+parallel
+    task_a = std.math.sqrt(144)
+    task_b = std.crypto.sha256("payload")
+end
+```
+
+---
+
+## Standard Library
+
+The TechScript standard library (`stdlib/`) provides built-in modules for enterprise scripting and system tasks:
+
+| Module | Identifier | Key Capabilities |
+| --- | --- | --- |
+| **System I/O** | `std.io` | Formatted console output, terminal interaction, colorization |
+| **Filesystem** | `std.fs` | Read/write files, recursive directory walks, metadata inspection |
+| **Networking & HTTP**| `std.http` | HTTP/HTTPS GET, POST, headers, cookies, REST clients |
+| **Data Formats** | `std.json`, `std.csv`, `std.yaml`, `std.toml` | Parsing, serialization, structured transformation |
+| **Databases** | `std.sqlite`, `std.database` | Embedded SQLite transactions, connection pooling, queries |
+| **Cryptography** | `std.crypto` | SHA-256, SHA-512, MD5, AES-GCM encryption, Base64 |
+| **Graphics & 2D** | `std.canvas` | Vector graphics rendering, PNG/JPEG export, chart generators |
+| **Time & Math** | `std.time`, `std.math`, `std.random` | Nanosecond precision timers, trigonometry, statistical distributions |
+| **Testing** | `std.testing` | `assert_eq`, test suites, mocking, benchmarker |
+
+---
+
+## Architecture & Toolchain Flowcharts
+
+### Compiler & Lowering Pipeline
+
+```mermaid
+flowchart TD
+    A[".txs Source Files / webforge.toml"] --> B["Lexer (tokens, spans, string interpolation)"]
+    B --> C["Pratt Parser (precedence, expressions, statements)"]
+    C --> D["Abstract Syntax Tree (AST)"]
+    D --> E["Semantic Analysis (scope, type checking, capability sandbox)"]
+    E --> F["Module Resolver (imports, exports, dependency graph)"]
+    F --> G["AST Optimizer (constant folding, dead-code elimination)"]
+    G --> H["Intermediate Representation (IR)"]
+    
+    H --> I["Bytecode Compiler"]
+    I --> J["Bytecode (.txc)"]
+    J --> K["Stack VM Execution Engine"]
+    
+    H --> L["LLVM Backend (Native Target)"]
+    L --> M["Native Executable (.exe / ELF / Mach-O)"]
+```
+
+### Runtime & Execution Backends
+
+```mermaid
+flowchart LR
+    subgraph FRONTEND ["Language Interface"]
+        CLI["tsc CLI Driver"]
+        LSP["Language Server (LSP)"]
+        FMT["Code Formatter (tsfmt)"]
+        LINT["Linter (tslint)"]
+    end
+
+    subgraph TARGETS ["Execution Targets"]
+        VM["Bytecode Virtual Machine (Fast REPL & Dev Server)"]
+        WebForge["WebForge Full-Stack Packager (Static Web & SQLite)"]
+        Native["LLVM Native Compiler (AOT Native Binary)"]
+    end
+
+    CLI --> VM
+    CLI --> WebForge
+    CLI --> Native
+```
+
+---
+
+## Installation
+
+TechScript requires **no external dependencies, build tools, or Rust installation**.
+
+### Windows
+
+#### Automated PowerShell Install
+```powershell
+irm https://raw.githubusercontent.com/Tcode-Motion/techscript/main/scripts/install.ps1 | iex
+```
+
+#### Manual Download
+1. Download `techscript-v2.0.0-windows-x86_64.zip` from [GitHub Releases](https://github.com/Tcode-Motion/techscript/releases).
+2. Extract to `C:\Users\<User>\AppData\Local\TechScript\bin`.
+3. Add the bin folder to your User `PATH`.
+
+Verify the installation:
+```powershell
+tsc version
+```
+
+### Linux & macOS
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Tcode-Motion/techscript/main/scripts/install.sh | bash
 ```
 
-### 3. 🤖 Android (Termux) Setup
-**Recommended Method (Shell script):**
+### Python Bootstrap Installer
+
 ```bash
-pkg update
-pkg install curl
+pip install techscript-lang
+techscript install
+```
+
+### Android & Termux
+
+```bash
+pkg update && pkg install curl
 curl -fsSL https://raw.githubusercontent.com/Tcode-Motion/techscript/main/scripts/install.sh | bash
 ```
-**Alternative Method (pip — Not Recommended):**
-```bash
-pkg update
-pkg install python
-pip install techscript
-techscript install
-```
-*(Note: Python installations in Termux may require the `--break-system-packages` flag under PEP 668).*
-
-### 4. 🐍 Via pip (All Platforms - Not Recommended)
-```bash
-pip install techscript       # or: pip install techscript-lang
-techscript install
-```
-The PyPI package auto-detects your OS/architecture and downloads the correct native binary from GitHub Releases.
-
-> **Homebrew** (`brew install techscript`), **Winget**, and **Scoop** support coming soon!
 
 ---
 
-## 🚀 Quick Start
+## CLI Reference
 
-Once TechScript is installed, you can write and execute your first script in under 10 seconds:
+The unified `tsc` binary (also symlinked as `webforge` and `techscript`) provides full control over development and deployment:
 
-1. **Create and Enter a Project Directory**:
-   ```bash
-   mkdir hello_world
-   cd hello_world
-   ```
-2. **Create a Script File**:
-   Create a new file named `hello.txs` and add:
-   ```txs
-   say "Hello, World! 🌍"
-   ```
-3. **Compile and Run**:
-   Run the file using the `tsc` compiler driver:
-   ```bash
-   tsc run hello.txs
-   ```
-
----
-
-## 📘 Language Guide
-
-TechScript's syntax builds from simple assignments to full structured programs:
-
-1. **Variables**: Assigned dynamically. No variable keywords required.
-   ```txs
-   message = "Hello TechScript"
-   ```
-2. **Conditionals**: Expressed via `when`/`else` blocks.
-   ```txs
-   when status == "active"
-       say "Running"
-   end
-   ```
-3. **Loops**: Multi-form `for` ranges or collection iterators.
-   ```txs
-   for i in 0..5
-       say i
-   end
-   ```
-4. **Functions**: Declared with `do` block and returns with `send`.
-   ```txs
-   do square(n)
-       send n * n
-   end
-   ```
-
-For detailed guides, see the [Language Guide](docs/LanguageGuide.md) and the [Syntax Guide](docs/SyntaxGuide.md).
-
----
-
-## 📚 Standard Library & Modules
-
-TechScript features a self-contained, native standard library:
-
-| Module | Description | Guide Link |
-|---|---|---|
-| `math` | Square root, trigonometry, and basic math operations | [Stdlib Reference](docs/StdlibReference.md) |
-| `collections` | Operations for pushing to lists or reading map keys | [Stdlib Reference](docs/StdlibReference.md) |
-| `file` | File writing, reading, and removal utilities | [Stdlib Reference](docs/StdlibReference.md) |
-| `json` | Encoding maps/lists to JSON strings and decoding them | [Stdlib Reference](docs/StdlibReference.md) |
-| `http` | HTTP client GET and POST utilities | [Stdlib Reference](docs/StdlibReference.md) |
-| `sqlite` | Local relational database connector | [Stdlib Reference](docs/StdlibReference.md) |
-| `canvas` | 2D vector viewport shapes and text drawing | [Canvas Guide](docs/CanvasGuide.md) |
-| `time` | Clock, scheduling, and thread sleep functions | [Stdlib Reference](docs/StdlibReference.md) |
-| `thread` | Native OS thread spawner and thread join interfaces | [Stdlib Reference](docs/StdlibReference.md) |
-| `ai` | Seamless Gemini prompt and text generation functions | [Stdlib Reference](docs/StdlibReference.md) |
-| `testing` | Assertion macros for unit testing suite | [Stdlib Reference](docs/StdlibReference.md) |
-
----
-
-## 🛠️ CLI Commands
-
-Run these subcommands via the unified `tsc` compiler driver:
-
-| Subcommand | Description |
-|---|---|
-| `run` | Compiles and executes a single `.txs` script |
-| `build` | Builds the workspace project matching `package.toml` |
-| `check` | Checks the workspace for compile-time errors |
-| `fmt` | Standardizes codebase layouts using `tsfmt` |
-| `lint` | Evaluates safety traps and warns on deprecated patterns |
-| `migrate` | Translates legacy v1.x scripts to v2.0 keywords |
-| `clean` | Deletes compiled target caches and logs |
-| `new` | Scaffolds a new workspace project |
-| `test` | Locates and executes all `#[test]` unit tests |
-| `repl` | Launches the interactive shell REPL |
-| `publish` | Submits the module package to the package registry |
-| `install` | Installs a library dependency |
-| `uninstall` | Removes an installed package |
-| `update` | Updates workspace packages to their latest versions |
-| `doctor` | Scans workspace paths and toolchain installations |
-| `dump-ast` | Outputs the AST representation in JSON/text format |
-| `dump-ir` | Outputs the Intermediate Representation |
-| `dump-bytecode` | Outputs the compiled virtual machine bytecode |
-| `emit-llvm` | Generates LLVM IR representation |
-| `emit-asm` | Generates assembly representation |
-| `benchmark` | Executes automated platform runtime benchmarks |
-
----
-
-## 🚀 Examples
-
-Find runnable examples in the [`examples/`](examples) folder:
-
-| Directory | Script | Description | Run Command |
-|---|---|---|---|
-| [ai](examples/ai) | `prompt.txs` | Prompting Gemini AI model natively via the standard library | `tsc run examples/ai/prompt.txs` |
-| [async](examples/async) | `async.txs` | Concurrent event loop with `async` subroutines and `await` | `tsc run examples/async/async.txs` |
-| [calculator](examples/calculator) | `calculator.txs` | Standard math functions and basic error throwing | `tsc run examples/calculator/calculator.txs` |
-| [canvas](examples/canvas) | `draw.txs` | Drawing rects, circles, text inside a viewport | `tsc run examples/canvas/draw.txs` |
-| [collections](examples/collections) | `collections.txs` | Manipulating and iterating over lists and maps | `tsc run examples/collections/collections.txs` |
-| [database](examples/database) | `db.txs` | Dynamic SQL schema setup and querying with SQLite | `tsc run examples/database/db.txs` |
-| [enums](examples/enums) | `enums.txs` | Declaring and pattern matching enum types | `tsc run examples/enums/enums.txs` |
-| [error_handling](examples/error_handling) | `errors.txs` | Exception handlers using `try`, `catch`, and `throw` | `tsc run examples/error_handling/errors.txs` |
-| [file_reader](examples/file_reader) | `reader.txs` | Writing, reading, and deleting files using the `file` module | `tsc run examples/file_reader/reader.txs` |
-| [generics](examples/generics) | `generics.txs` | Dynamic functions and dynamically-typed structs/boxes | `tsc run examples/generics/generics.txs` |
-| [guess_number](examples/guess_number) | `guess.txs` | Simulates a guess-the-number game loop | `tsc run examples/guess_number/guess.txs` |
-| [hello_world](examples/hello_world) | `hello.txs` | Classic Hello World script printing text | `tsc run examples/hello_world/hello.txs` |
-| [http_server](examples/http_server) | `server.txs` | Simulated HTTP Server endpoints mock | `tsc run examples/http_server/server.txs` |
-| [json_parser](examples/json_parser) | `parser.txs` | Parsing JSON string to map structure and vice-versa | `tsc run examples/json_parser/parser.txs` |
-| [modules](examples/modules) | `main.txs` | Standard library imports and custom module scope | `tsc run examples/modules/main.txs` |
-| [oop](examples/oop) | `oop.txs` | Structural Object-Oriented programming using mapping definitions | `tsc run examples/oop/oop.txs` |
-| [testing](examples/testing) | `unit_test.txs` | Declaring assertions using the built-in testing harness | `tsc run examples/testing/unit_test.txs` |
-| [threads](examples/threads) | `threads.txs` | Spawning and joining OS threads via thread module | `tsc run examples/threads/threads.txs` |
-| [todo_cli](examples/todo_cli) | `todo.txs` | Comprehensive lists/maps workflow for tasks | `tsc run examples/todo_cli/todo.txs` |
-| [web_api](examples/web_api) | `web_api.txs` | Standard HTTP client request and response retrieval | `tsc run examples/web_api/web_api.txs` |
-
----
-
-## 💻 Editor & IDE Support
-
-Official support is available for **Visual Studio Code**:
-
-1. Open the VS Code Extensions pane (`Ctrl+Shift+X`).
-2. Search for **"TechScript 2.0"** (published by `tanmoy`).
-3. Click **Install**.
-4. *(Optional)* Select **Preferences → File Icon Theme → TechScript Icon Theme** to enable custom project file icons.
-
-*Install links:*
-- **[VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=tanmoy.techscript)**
-- **[Open VSX Registry](https://open-vsx.org/extension/Tcode-Motion/techscript)**
-
----
-
-## 📖 Documentation Portal
-
-Browse detailed guides in the [`docs/`](docs) folder:
-
-| Document | Description |
-|---|---|
-| [API Reference](docs/APIReference.md) | In-depth compiler API design specifications |
-| [Best Practices](docs/BestPractices.md) | Guidelines for coding layout and memory conventions |
-| [Canvas Guide](docs/CanvasGuide.md) | Methods and viewport parameters for shapes drawing |
-| [Compiler Architecture](docs/CompilerArchitecture.md) | Pipeline description from Lexer to optimization phases |
-| [DSL Guide](docs/DSLGuide.md) | Designing Domain-Specific layout submodules |
-| [Examples Guide](docs/ExamplesGuide.md) | Standard running process for bundled projects |
-| [FAQ](docs/FAQ.md) | Common troubleshooting and engine setup questions |
-| [Installation Guide](docs/Installation.md) | Complete environment configuration guidelines |
-| [Language Guide](docs/LanguageGuide.md) | Syntax specifications for statements and variables |
-| [Migration Guide](docs/MigrationGuide.md) | Moving codebase parameters from legacy v1.x configurations |
-| [Performance Reference](docs/Performance.md) | VM execution benchmarks and compile flag details |
-| [Release Notes](docs/ReleaseNotes.md) | Historical logs of compiled target stable versions |
-| [Roadmap](docs/Roadmap.md) | Milestones and future compiler targets |
-| [Stdlib Reference](docs/StdlibReference.md) | Comprehensive standard library module interface list |
-| [Syntax Guide](docs/SyntaxGuide.md) | Cheatsheet for variables, loops, control blocks |
-| [Web Guide](docs/WebGuide.md) | Native website compile-generation parameters |
-
----
-
-## 🗺️ Roadmap
-
-- [x] Pratt parser for expressions.
-- [x] Custom event loop with `async` and `await`.
-- [x] Bundled compiler tools (`fmt`, `lint`, `test`).
-- [ ] Complete LLVM code generation backend for static binaries.
-- [ ] Add debugger and tracing memory profiler in standard tools.
-- [ ] Formally verify core standard libraries.
-
----
-
-## 📂 Repo Structure
-
-An overview of the TechScript workspace directories:
-
-```
-techscript/
-├── .devcontainer/       # Dev Container definitions
-├── .github/             # GitHub templates and workflows
-├── .vscode/             # Editor settings
-├── assets/              # Logos and graphics
-├── cli/                 # Crate for the `tsc` compiler driver CLI
-├── compiler/            # Crate subfolders for language compiler phases
-│   ├── ast/             # Abstract Syntax Tree representation
-│   ├── bytecode/        # Bytecode generation definitions
-│   ├── common/          # Shared utilities and spans
-│   ├── errors/          # Custom diagnostic engine and error codes
-│   ├── ir/              # Intermediate Representation (IR) generation
-│   ├── lexer/           # Logos-based lexer
-│   ├── llvm_backend/    # LLVM native compilation module
-│   ├── module_resolver/ # Module imports resolver
-│   ├── optimizer/       # Constant folding and AST simplifications
-│   ├── parser/          # Pratt expression and statement parser
-│   ├── semantic/        # Symbol table, scopes, and semantic checks
-│   └── syntax/          # Token kind and keyword definitions
-├── docs/                # Language documentation and guides
-├── editors/             # VS Code extension source and VSIX packages
-├── examples/            # Sample projects and code snippets
-├── installer/           # Script files for compiling installer executables
-├── runtime/             # Crate subfolders for program execution
-│   ├── builtins/        # Standard library module implementations
-│   ├── gc/              # NaN-boxed VM Garbage Collector
-│   ├── interpreter/     # Tree-walk AST execution engine
-│   ├── native_runtime/  # Runtime libraries for LLVM executables
-│   ├── runtime/         # VM execution context and states
-│   └── vm/              # Stack-based Bytecode Virtual Machine (VM)
-├── scripts/             # Utility and platform installation scripts
-├── stdlib/              # Standard library header definitions
-├── templates/           # New project templates
-└── tools/               # Ecosystem tools
-    ├── formatter/       # Formatter engine (`tsfmt`)
-    ├── linter/          # Linter analyzer (`tslint`)
-    ├── lsp/             # Language Server (`techscript-lsp`)
-    ├── package-manager/ # Package manager client (`tspm`)
-    └── packager/        # Source code packager
+```text
+Usage:
+  tsc <command> [options]
+  webforge <command> [options]
+  techscript <command> [options]
 ```
 
+| Command | Arguments | Description |
+| --- | --- | --- |
+| `tsc new` | `<template> <name>` | Scaffold a project (`website`, `fullstack`, `api`, `3d`, `console`, `cli`, `library`) |
+| `tsc dev` | `[port]` | Start WebForge live development server with hot-reload (default: 3000) |
+| `tsc run` | `<file.txs>` | Compile and run a script or package entrypoint |
+| `tsc build` | `[--target web\|vm\|native]` | Compile project into web bundle, bytecode, or native binary |
+| `tsc check` | `[file.txs]` | Perform semantic analysis and type checking without execution |
+| `tsc test` | `[path]` | Run unit and integration tests (`*_test.txs`) |
+| `tsc fmt` | `[--check]` | Automatically format all `.txs` source files |
+| `tsc lint` | `[--fix]` | Lint codebase and automatically apply safe fixes |
+| `tsc repl` | | Launch the interactive Read-Eval-Print Loop |
+| `tsc add` | `<package>` | Install and register a dependency from the official package registry |
+| `tsc doctor` | | Inspect environment health, paths, and platform capabilities |
+| `tsc version`| `[--version]` | Print full toolchain version and component manifest |
+
 ---
 
-## 🤝 Contributing
+## Project Templates
 
-Contributions are welcome! Please read the [Contributing Guidelines](.github/CONTRIBUTING.md) to set up your local development environment and run tests:
+Scaffold pre-configured project architectures instantly:
 
 ```bash
-cargo build
-cargo test
+# Modern WebForge Website (Pages, Hero, Cards, Light/Dark theme, SQLite)
+tsc new website my-site
+
+# Full-Stack WebForge Application with Server APIs & 3D WebGL scenes
+tsc new fullstack my-app
+
+# REST API microservice with embedded HTTP server and JSON routing
+tsc new api my-api
+
+# Standalone 3D WebGL Canvas Scene
+tsc new 3d my-scene
+
+# Command-line utility or tool
+tsc new cli my-tool
+
+# Standard software library
+tsc new library my-lib
 ```
 
 ---
 
-## 🔗 Links & Social Media
+## Contributing & Policies
 
-* **Official Website**: [techscript.is-a.dev](https://techscript.is-a.dev)
-* **GitHub Repository**: [Tcode-Motion/techscript](https://github.com/Tcode-Motion/techscript)
-* **GitHub Discussions**: [Tcode-Motion/techscript/discussions](https://github.com/Tcode-Motion/techscript/discussions)
-* **Discord Community**: [Join Discord (Community Chat)](https://discord.gg/tRtNbuDUr)
+We welcome community contributions, language enhancements, and bug reports!
+
+- **Contributing Guide**: [CONTRIBUTING.md](CONTRIBUTING.md) — Setup guidelines, branch strategy, testing rules, and pull request workflows.
+- **Code of Conduct**: [.github/CODE_OF_CONDUCT.md](.github/CODE_OF_CONDUCT.md) — Community expectations and inclusive collaboration.
+- **Security Policy**: [SECURITY.md](SECURITY.md) — Vulnerability reporting and patch timelines.
+- **Official Documentation**: [https://is-a.dev/techscript/](https://is-a.dev/techscript/)
+- **GitHub Discussions**: [https://github.com/Tcode-Motion/techscript/discussions](https://github.com/Tcode-Motion/techscript/discussions)
+- **Issue Tracker**: [https://github.com/Tcode-Motion/techscript/issues](https://github.com/Tcode-Motion/techscript/issues)
 
 ---
 
-## 📄 License
+## License
 
-TechScript is released under the **MIT License**. See [LICENSE](LICENSE) for details.
+TechScript and the WebForge framework are distributed under the **[Apache License 2.0](LICENSE)**.
+
+```text
+Copyright 2026 Tcode-Motion / TechScript Contributors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```

@@ -1,6 +1,7 @@
 [package]
 name = "techscript_lsp"
 version = "2.0.0"
+license = "Apache-2.0"
 edition = "2021"
 description = "Language Server Protocol bindings for TechScript 2.0 compiler IDE features"
 
@@ -20,3 +21,14 @@ tower-lsp = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { version = "1", features = ["full"] }
+
+[dev-dependencies]
+criterion = "0.8.2"
+
+[[bench]]
+name = "bench"
+harness = false
+
+[[bench]]
+name = "bench_diagnostic"
+harness = false

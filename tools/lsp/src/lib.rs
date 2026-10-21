@@ -752,11 +752,11 @@ impl LanguageServer for Backend {
             while let Some(pos_in_line) = line[start_pos..].find(&word) {
                 let actual_pos = start_pos + pos_in_line;
                 let char_before = if actual_pos > 0 {
-                    line.chars().nth(actual_pos - 1)
+                    line[..actual_pos].chars().next_back()
                 } else {
                     None
                 };
-                let char_after = line.chars().nth(actual_pos + word_len);
+                let char_after = line[actual_pos + word_len..].chars().next();
 
                 let is_boundary_before =
                     char_before.map_or(true, |c| !c.is_alphanumeric() && c != '_');
@@ -803,11 +803,11 @@ impl LanguageServer for Backend {
             while let Some(pos_in_line) = line[start_pos..].find(&word) {
                 let actual_pos = start_pos + pos_in_line;
                 let char_before = if actual_pos > 0 {
-                    line.chars().nth(actual_pos - 1)
+                    line[..actual_pos].chars().next_back()
                 } else {
                     None
                 };
-                let char_after = line.chars().nth(actual_pos + word_len);
+                let char_after = line[actual_pos + word_len..].chars().next();
 
                 let is_boundary_before =
                     char_before.map_or(true, |c| !c.is_alphanumeric() && c != '_');
@@ -1291,11 +1291,18 @@ impl LanguageServer for Backend {
         let start = range.start.line as usize;
         let end = (range.end.line as usize).min(lines.len() - 1);
 
-        let mut selection = String::new();
-        for i in start..=end {
-            selection.push_str(lines[i]);
-            selection.push('\n');
-        }
+        let selection = if start <= end {
+            let slice = &lines[start..=end];
+            let capacity: usize = slice.iter().map(|l| l.len() + 1).sum();
+            let mut s = String::with_capacity(capacity);
+            for line in slice {
+                s.push_str(line);
+                s.push('\n');
+            }
+            s
+        } else {
+            String::new()
+        };
 
         let formatted = self.format_source(&selection);
         Ok(Some(vec![TextEdit {
@@ -1403,7 +1410,7 @@ impl LanguageServer for Backend {
         let mut actions = Vec::new();
         let uri = params.text_document.uri;
 
-        // Quick Fix 1: Organize Imports Action
+        // Code Action 1: Organize Imports
         let mut organize_edits = Vec::new();
         organize_edits.push(TextEdit {
             range: Range {
@@ -1427,11 +1434,11 @@ impl LanguageServer for Backend {
             ..Default::default()
         }));
 
-        // Quick Fix 2: Convert mutable "make" to immutable "const"
+        // Code Action 2: Convert mutable "make" to immutable "const"
         for diagnostic in params.context.diagnostics {
             if let Some(ref code) = diagnostic.code {
                 if let NumberOrString::String(ref s) = code {
-                    if s.contains("warning") {
+                    if s == "warning" {
                         let mut const_edits = Vec::new();
                         const_edits.push(TextEdit {
                             range: diagnostic.range,

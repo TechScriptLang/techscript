@@ -162,264 +162,10 @@ impl LoweringContext {
             Statement::Expression(expr_stmt) => {
                 let _ = self.lower_expression(&expr_stmt.expression);
             }
-            Statement::If(if_stmt) => {
-                let cond_val = self.lower_expression(&if_stmt.condition);
-                let then_block = self.builder.new_block("if_then".to_string());
-                let else_block = self.builder.new_block("if_else".to_string());
-                let merge_block = self.builder.new_block("if_merge".to_string());
-
-                self.builder.emit_terminator(
-                    TerminatorKind::ConditionalJump {
-                        cond: cond_val,
-                        then_block,
-                        else_block,
-                    },
-                    if_stmt.span,
-                );
-
-                // Then path
-                self.builder.enter_block(then_block, "if_then".to_string());
-                self.lower_block(&if_stmt.body);
-                self.builder
-                    .emit_terminator(TerminatorKind::Jump(merge_block), if_stmt.span);
-
-                // Else path (with nested else-ifs mapped recursively)
-                self.builder.enter_block(else_block, "if_else".to_string());
-                if let Some(ref else_body) = if_stmt.else_body {
-                    self.lower_block(else_body);
-                }
-                self.builder
-                    .emit_terminator(TerminatorKind::Jump(merge_block), if_stmt.span);
-
-                // Merge path
-                self.builder
-                    .enter_block(merge_block, "if_merge".to_string());
-            }
-            Statement::While(while_stmt) => {
-                let cond_block = self.builder.new_block("while_cond".to_string());
-                let body_block = self.builder.new_block("while_body".to_string());
-                let exit_block = self.builder.new_block("while_exit".to_string());
-
-                self.builder
-                    .emit_terminator(TerminatorKind::Jump(cond_block), while_stmt.span);
-
-                // Cond path
-                self.builder
-                    .enter_block(cond_block, "while_cond".to_string());
-                let cond_val = self.lower_expression(&while_stmt.condition);
-                self.builder.emit_terminator(
-                    TerminatorKind::ConditionalJump {
-                        cond: cond_val,
-                        then_block: body_block,
-                        else_block: exit_block,
-                    },
-                    while_stmt.span,
-                );
-
-                // Body path
-                self.break_stack.push(exit_block);
-                self.continue_stack.push(cond_block);
-
-                self.builder
-                    .enter_block(body_block, "while_body".to_string());
-                self.lower_block(&while_stmt.body);
-                self.builder
-                    .emit_terminator(TerminatorKind::Jump(cond_block), while_stmt.span);
-
-                self.break_stack.pop();
-                self.continue_stack.pop();
-
-                // Exit path
-                self.builder
-                    .enter_block(exit_block, "while_exit".to_string());
-            }
-            Statement::For(for_stmt) => {
-                let _init_block = self.builder.new_block("for_init".to_string());
-                let cond_block = self.builder.new_block("for_cond".to_string());
-                let body_block = self.builder.new_block("for_body".to_string());
-                let inc_block = self.builder.new_block("for_inc".to_string());
-                let exit_block = self.builder.new_block("for_exit".to_string());
-
-                // Init path: evaluate iterable, store list and index=0
-                let iter_val = self.lower_expression(&for_stmt.iterable);
-                let iter_local = self.builder.allocate_local(IRType::Any);
-                let idx_local = self.builder.allocate_local(IRType::Any);
-                self.builder.emit_effect(
-                    Op::Store {
-                        target: Value::Local(iter_local),
-                        value: iter_val,
-                    },
-                    for_stmt.span,
-                );
-                let zero_idx = self.builder.emit_instruction(
-                    Op::Constant(LiteralVal::Int(0)),
-                    IRType::Int64,
-                    for_stmt.span,
-                );
-                self.builder.emit_effect(
-                    Op::Store {
-                        target: Value::Local(idx_local),
-                        value: Value::Temp(zero_idx),
-                    },
-                    for_stmt.span,
-                );
-
-                self.builder
-                    .emit_terminator(TerminatorKind::Jump(cond_block), for_stmt.span);
-
-                // Cond path: load index, load len(list), compare index < len(list)
-                self.builder.enter_block(cond_block, "for_cond".to_string());
-                let idx_load = self.builder.emit_instruction(
-                    Op::Load(Value::Local(idx_local)),
-                    IRType::Int64,
-                    for_stmt.span,
-                );
-                let iter_load = self.builder.emit_instruction(
-                    Op::Load(Value::Local(iter_local)),
-                    IRType::Any,
-                    for_stmt.span,
-                );
-                let len_global = self.builder.declare_global("len".to_string(), IRType::Any);
-                let len_call = self.builder.emit_instruction(
-                    Op::Call {
-                        callee: Value::Global(len_global),
-                        args: vec![Value::Temp(iter_load)],
-                    },
-                    IRType::Int64,
-                    for_stmt.span,
-                );
-                let cond_val = self.builder.emit_instruction(
-                    Op::Compare {
-                        op: techscript_syntax::TokenKind::Less,
-                        left: Value::Temp(idx_load),
-                        right: Value::Temp(len_call),
-                    },
-                    IRType::Bool,
-                    for_stmt.span,
-                );
-                self.builder.emit_terminator(
-                    TerminatorKind::ConditionalJump {
-                        cond: Value::Temp(cond_val),
-                        then_block: body_block,
-                        else_block: exit_block,
-                    },
-                    for_stmt.span,
-                );
-
-                // Body path: load list[idx] into loop variable
-                self.break_stack.push(exit_block);
-                self.continue_stack.push(inc_block);
-
-                self.builder.enter_block(body_block, "for_body".to_string());
-                let iter_load_body = self.builder.emit_instruction(
-                    Op::Load(Value::Local(iter_local)),
-                    IRType::Any,
-                    for_stmt.span,
-                );
-                let idx_load_body = self.builder.emit_instruction(
-                    Op::Load(Value::Local(idx_local)),
-                    IRType::Int64,
-                    for_stmt.span,
-                );
-                let elem = self.builder.emit_instruction(
-                    Op::IndexLoad {
-                        base: Value::Temp(iter_load_body),
-                        index: Value::Temp(idx_load_body),
-                    },
-                    IRType::Any,
-                    for_stmt.span,
-                );
-                let loop_param = self.builder.allocate_local(IRType::Any);
-                self.symbol_map.insert(
-                    for_stmt.item.name.clone(),
-                    SymbolBinding::Local(loop_param, IRType::Any),
-                );
-                self.builder.emit_effect(
-                    Op::Store {
-                        target: Value::Local(loop_param),
-                        value: Value::Temp(elem),
-                    },
-                    for_stmt.span,
-                );
-
-                self.lower_block(&for_stmt.body);
-                self.builder
-                    .emit_terminator(TerminatorKind::Jump(inc_block), for_stmt.span);
-
-                // Increment path: idx = idx + 1
-                self.builder.enter_block(inc_block, "for_inc".to_string());
-                let old_idx = self.builder.emit_instruction(
-                    Op::Load(Value::Local(idx_local)),
-                    IRType::Int64,
-                    for_stmt.span,
-                );
-                let one = self.builder.emit_instruction(
-                    Op::Constant(LiteralVal::Int(1)),
-                    IRType::Int64,
-                    for_stmt.span,
-                );
-                let new_idx = self.builder.emit_instruction(
-                    Op::BinaryOp {
-                        op: techscript_syntax::TokenKind::Plus,
-                        left: Value::Temp(old_idx),
-                        right: Value::Temp(one),
-                    },
-                    IRType::Int64,
-                    for_stmt.span,
-                );
-                self.builder.emit_effect(
-                    Op::Store {
-                        target: Value::Local(idx_local),
-                        value: Value::Temp(new_idx),
-                    },
-                    for_stmt.span,
-                );
-                self.builder
-                    .emit_terminator(TerminatorKind::Jump(cond_block), for_stmt.span);
-
-                self.break_stack.pop();
-                self.continue_stack.pop();
-
-                // Exit path
-                self.builder.enter_block(exit_block, "for_exit".to_string());
-            }
-            Statement::Repeat(repeat_stmt) => {
-                let cond_block = self.builder.new_block("repeat_cond".to_string());
-                let body_block = self.builder.new_block("repeat_body".to_string());
-                let exit_block = self.builder.new_block("repeat_exit".to_string());
-
-                self.builder
-                    .emit_terminator(TerminatorKind::Jump(cond_block), repeat_stmt.span);
-
-                // Cond: evaluate condition each iteration
-                self.builder
-                    .enter_block(cond_block, "repeat_cond".to_string());
-                let cond_val = self.lower_expression(&repeat_stmt.count);
-                self.builder.emit_terminator(
-                    TerminatorKind::ConditionalJump {
-                        cond: cond_val,
-                        then_block: body_block,
-                        else_block: exit_block,
-                    },
-                    repeat_stmt.span,
-                );
-
-                // Body
-                self.break_stack.push(exit_block);
-                self.continue_stack.push(cond_block);
-
-                self.builder
-                    .enter_block(body_block, "repeat_body".to_string());
-                self.lower_block(&repeat_stmt.body);
-                self.builder
-                    .emit_terminator(TerminatorKind::Jump(cond_block), repeat_stmt.span);
-
-                self.break_stack.pop();
-                self.continue_stack.pop();
-
-                self.builder
-                    .enter_block(exit_block, "repeat_exit".to_string());
-            }
+            Statement::If(if_stmt) => self.lower_if(if_stmt),
+            Statement::While(while_stmt) => self.lower_while(while_stmt),
+            Statement::For(for_stmt) => self.lower_for(for_stmt),
+            Statement::Repeat(repeat_stmt) => self.lower_repeat(repeat_stmt),
             Statement::Break(break_stmt) => {
                 if let Some(target) = self.break_stack.last().cloned() {
                     self.builder
@@ -445,55 +191,7 @@ impl LoweringContext {
                 self.builder
                     .emit_terminator(TerminatorKind::Throw(val), throw_stmt.span);
             }
-            Statement::Try(try_stmt) => {
-                // Lower try blocks as consecutive basic blocks
-                let try_block = self.builder.new_block("try_body".to_string());
-                let try_next = self.builder.new_block("try_next".to_string());
-                let catch_block = self.builder.new_block("catch_body".to_string());
-                let merge_block = self.builder.new_block("try_merge".to_string());
-
-                let catch_var = self.builder.allocate_local(IRType::String);
-                self.symbol_map.insert(
-                    try_stmt.catch_var.name.clone(),
-                    SymbolBinding::Local(catch_var, IRType::String),
-                );
-
-                self.builder.emit_effect(
-                    Op::Try {
-                        catch_block,
-                        catch_var,
-                    },
-                    try_stmt.span,
-                );
-
-                self.builder
-                    .emit_terminator(TerminatorKind::Jump(try_block), try_stmt.span);
-
-                // Try Body
-                self.builder.enter_block(try_block, "try_body".to_string());
-                self.lower_block(&try_stmt.body);
-                if !self.builder.has_terminator() {
-                    self.builder
-                        .emit_terminator(TerminatorKind::Jump(try_next), try_stmt.span);
-                }
-
-                // Try next (normal completion path — runs EndTry then jumps to merge)
-                self.builder.enter_block(try_next, "try_next".to_string());
-                self.builder.emit_effect(Op::EndTry, try_stmt.span);
-                self.builder
-                    .emit_terminator(TerminatorKind::Jump(merge_block), try_stmt.span);
-
-                // Catch Body
-                self.builder
-                    .enter_block(catch_block, "catch_body".to_string());
-                self.lower_block(&try_stmt.catch_body);
-                self.builder
-                    .emit_terminator(TerminatorKind::Jump(merge_block), try_stmt.span);
-
-                // Merge
-                self.builder
-                    .enter_block(merge_block, "try_merge".to_string());
-            }
+            Statement::Try(try_stmt) => self.lower_try(try_stmt),
             Statement::Say(say_stmt) => {
                 let val = self.lower_expression(&say_stmt.value);
                 self.builder.emit_effect(
@@ -517,74 +215,7 @@ impl LoweringContext {
                 self.lower_statement(&decl.declaration);
             }
             Statement::Import(import_stmt) => {
-                let path_str = import_stmt
-                    .path
-                    .iter()
-                    .map(|ident| ident.name.clone())
-                    .collect::<Vec<_>>()
-                    .join("/");
-                self.builder.declare_import(path_str);
-
-                if let Some(symbols) = &import_stmt.symbols {
-                    if import_stmt.path.len() > 1
-                        && symbols.len() == 1
-                        && !symbols[0].name.contains(':')
-                        && symbols[0].name != "*"
-                    {
-                        let alias_name = symbols[0].name.clone();
-                        // For namespace alias, the global variable representing it is the root namespace of the path
-                        let root_name = import_stmt.path[0].name.clone();
-                        let global_id = self.builder.declare_global(root_name, IRType::Any);
-                        self.symbol_map
-                            .insert(alias_name, SymbolBinding::Global(global_id, IRType::Any));
-                    } else {
-                        for sym in symbols {
-                            if sym.name == "*" {
-                                let module_path = import_stmt
-                                    .path
-                                    .iter()
-                                    .map(|i| i.name.clone())
-                                    .collect::<Vec<_>>()
-                                    .join(".");
-                                let registry = techscript_stdlib::StdlibRegistry::new();
-                                if let Some(module) = registry.get_module(&module_path) {
-                                    for func_name in module.exports.keys() {
-                                        let global_id = self
-                                            .builder
-                                            .declare_global(func_name.clone(), IRType::Any);
-                                        self.symbol_map.insert(
-                                            func_name.clone(),
-                                            SymbolBinding::Global(global_id, IRType::Any),
-                                        );
-                                    }
-                                }
-                            } else if sym.name.contains(':') {
-                                let parts: Vec<&str> = sym.name.split(':').collect();
-                                let orig_name = parts[0].to_string();
-                                let alias_name = parts[1].to_string();
-                                let global_id = self.builder.declare_global(orig_name, IRType::Any);
-                                self.symbol_map.insert(
-                                    alias_name,
-                                    SymbolBinding::Global(global_id, IRType::Any),
-                                );
-                            } else {
-                                let global_id =
-                                    self.builder.declare_global(sym.name.clone(), IRType::Any);
-                                self.symbol_map.insert(
-                                    sym.name.clone(),
-                                    SymbolBinding::Global(global_id, IRType::Any),
-                                );
-                            }
-                        }
-                    }
-                } else if !import_stmt.path.is_empty() {
-                    let root_name = import_stmt.path[0].name.clone();
-                    let global_id = self.builder.declare_global(root_name.clone(), IRType::Any);
-                    self.symbol_map.insert(
-                        root_name.clone(),
-                        SymbolBinding::Global(global_id, IRType::Any),
-                    );
-                }
+                self.lower_import(import_stmt);
             }
             Statement::EnumDecl(decl) => {
                 // Declare enum type globally
@@ -604,6 +235,73 @@ impl LoweringContext {
                     .builder
                     .declare_global(block.kind.clone(), IRType::DslBlock(block.kind.clone()));
             }
+        }
+    }
+
+    fn lower_import(&mut self, import_stmt: &techscript_ast::ImportStmt) {
+        let path_str = import_stmt
+            .path
+            .iter()
+            .map(|ident| ident.name.clone())
+            .collect::<Vec<_>>()
+            .join("/");
+        self.builder.declare_import(path_str);
+
+        if let Some(symbols) = &import_stmt.symbols {
+            if import_stmt.path.len() > 1
+                && symbols.len() == 1
+                && !symbols[0].name.contains(':')
+                && symbols[0].name != "*"
+            {
+                let alias_name = symbols[0].name.clone();
+                // For namespace alias, the global variable representing it is the root namespace of the path
+                let root_name = import_stmt.path[0].name.clone();
+                let global_id = self.builder.declare_global(root_name, IRType::Any);
+                self.symbol_map
+                    .insert(alias_name, SymbolBinding::Global(global_id, IRType::Any));
+            } else {
+                for sym in symbols {
+                    if sym.name == "*" {
+                        let module_path = import_stmt
+                            .path
+                            .iter()
+                            .map(|i| i.name.clone())
+                            .collect::<Vec<_>>()
+                            .join(".");
+                        let registry = techscript_stdlib::StdlibRegistry::new();
+                        if let Some(module) = registry.get_module(&module_path) {
+                            for func_name in module.exports.keys() {
+                                let global_id =
+                                    self.builder.declare_global(func_name.clone(), IRType::Any);
+                                self.symbol_map.insert(
+                                    func_name.clone(),
+                                    SymbolBinding::Global(global_id, IRType::Any),
+                                );
+                            }
+                        }
+                    } else if sym.name.contains(':') {
+                        let parts: Vec<&str> = sym.name.split(':').collect();
+                        let orig_name = parts[0].to_string();
+                        let alias_name = parts[1].to_string();
+                        let global_id = self.builder.declare_global(orig_name, IRType::Any);
+                        self.symbol_map
+                            .insert(alias_name, SymbolBinding::Global(global_id, IRType::Any));
+                    } else {
+                        let global_id = self.builder.declare_global(sym.name.clone(), IRType::Any);
+                        self.symbol_map.insert(
+                            sym.name.clone(),
+                            SymbolBinding::Global(global_id, IRType::Any),
+                        );
+                    }
+                }
+            }
+        } else if !import_stmt.path.is_empty() {
+            let root_name = import_stmt.path[0].name.clone();
+            let global_id = self.builder.declare_global(root_name.clone(), IRType::Any);
+            self.symbol_map.insert(
+                root_name.clone(),
+                SymbolBinding::Global(global_id, IRType::Any),
+            );
         }
     }
 
@@ -1290,6 +988,318 @@ impl LoweringContext {
         }
 
         value
+    }
+
+    fn lower_if(&mut self, if_stmt: &techscript_ast::IfStmt) {
+        let cond_val = self.lower_expression(&if_stmt.condition);
+        let then_block = self.builder.new_block("if_then".to_string());
+        let else_block = self.builder.new_block("if_else".to_string());
+        let merge_block = self.builder.new_block("if_merge".to_string());
+
+        self.builder.emit_terminator(
+            TerminatorKind::ConditionalJump {
+                cond: cond_val,
+                then_block,
+                else_block,
+            },
+            if_stmt.span,
+        );
+
+        // Then path
+        self.builder.enter_block(then_block, "if_then".to_string());
+        self.lower_block(&if_stmt.body);
+        self.builder
+            .emit_terminator(TerminatorKind::Jump(merge_block), if_stmt.span);
+
+        // Else path (with nested else-ifs mapped recursively)
+        self.builder.enter_block(else_block, "if_else".to_string());
+        if let Some(ref else_body) = if_stmt.else_body {
+            self.lower_block(else_body);
+        }
+        self.builder
+            .emit_terminator(TerminatorKind::Jump(merge_block), if_stmt.span);
+
+        // Merge path
+        self.builder
+            .enter_block(merge_block, "if_merge".to_string());
+    }
+
+    fn lower_while(&mut self, while_stmt: &techscript_ast::WhileStmt) {
+        let cond_block = self.builder.new_block("while_cond".to_string());
+        let body_block = self.builder.new_block("while_body".to_string());
+        let exit_block = self.builder.new_block("while_exit".to_string());
+
+        self.builder
+            .emit_terminator(TerminatorKind::Jump(cond_block), while_stmt.span);
+
+        // Cond path
+        self.builder
+            .enter_block(cond_block, "while_cond".to_string());
+        let cond_val = self.lower_expression(&while_stmt.condition);
+        self.builder.emit_terminator(
+            TerminatorKind::ConditionalJump {
+                cond: cond_val,
+                then_block: body_block,
+                else_block: exit_block,
+            },
+            while_stmt.span,
+        );
+
+        // Body path
+        self.break_stack.push(exit_block);
+        self.continue_stack.push(cond_block);
+
+        self.builder
+            .enter_block(body_block, "while_body".to_string());
+        self.lower_block(&while_stmt.body);
+        self.builder
+            .emit_terminator(TerminatorKind::Jump(cond_block), while_stmt.span);
+
+        self.break_stack.pop();
+        self.continue_stack.pop();
+
+        // Exit path
+        self.builder
+            .enter_block(exit_block, "while_exit".to_string());
+    }
+
+    fn lower_for(&mut self, for_stmt: &techscript_ast::ForStmt) {
+        let _init_block = self.builder.new_block("for_init".to_string());
+        let cond_block = self.builder.new_block("for_cond".to_string());
+        let body_block = self.builder.new_block("for_body".to_string());
+        let inc_block = self.builder.new_block("for_inc".to_string());
+        let exit_block = self.builder.new_block("for_exit".to_string());
+
+        // Init path: evaluate iterable, store list and index=0
+        let iter_val = self.lower_expression(&for_stmt.iterable);
+        let iter_local = self.builder.allocate_local(IRType::Any);
+        let idx_local = self.builder.allocate_local(IRType::Any);
+        self.builder.emit_effect(
+            Op::Store {
+                target: Value::Local(iter_local),
+                value: iter_val,
+            },
+            for_stmt.span,
+        );
+        let zero_idx = self.builder.emit_instruction(
+            Op::Constant(LiteralVal::Int(0)),
+            IRType::Int64,
+            for_stmt.span,
+        );
+        self.builder.emit_effect(
+            Op::Store {
+                target: Value::Local(idx_local),
+                value: Value::Temp(zero_idx),
+            },
+            for_stmt.span,
+        );
+
+        self.builder
+            .emit_terminator(TerminatorKind::Jump(cond_block), for_stmt.span);
+
+        // Cond path: load index, load len(list), compare index < len(list)
+        self.builder.enter_block(cond_block, "for_cond".to_string());
+        let idx_load = self.builder.emit_instruction(
+            Op::Load(Value::Local(idx_local)),
+            IRType::Int64,
+            for_stmt.span,
+        );
+        let iter_load = self.builder.emit_instruction(
+            Op::Load(Value::Local(iter_local)),
+            IRType::Any,
+            for_stmt.span,
+        );
+        let len_global = self.builder.declare_global("len".to_string(), IRType::Any);
+        let len_call = self.builder.emit_instruction(
+            Op::Call {
+                callee: Value::Global(len_global),
+                args: vec![Value::Temp(iter_load)],
+            },
+            IRType::Int64,
+            for_stmt.span,
+        );
+        let cond_val = self.builder.emit_instruction(
+            Op::Compare {
+                op: techscript_syntax::TokenKind::Less,
+                left: Value::Temp(idx_load),
+                right: Value::Temp(len_call),
+            },
+            IRType::Bool,
+            for_stmt.span,
+        );
+        self.builder.emit_terminator(
+            TerminatorKind::ConditionalJump {
+                cond: Value::Temp(cond_val),
+                then_block: body_block,
+                else_block: exit_block,
+            },
+            for_stmt.span,
+        );
+
+        // Body path: load list[idx] into loop variable
+        self.break_stack.push(exit_block);
+        self.continue_stack.push(inc_block);
+
+        self.builder.enter_block(body_block, "for_body".to_string());
+        let iter_load_body = self.builder.emit_instruction(
+            Op::Load(Value::Local(iter_local)),
+            IRType::Any,
+            for_stmt.span,
+        );
+        let idx_load_body = self.builder.emit_instruction(
+            Op::Load(Value::Local(idx_local)),
+            IRType::Int64,
+            for_stmt.span,
+        );
+        let elem = self.builder.emit_instruction(
+            Op::IndexLoad {
+                base: Value::Temp(iter_load_body),
+                index: Value::Temp(idx_load_body),
+            },
+            IRType::Any,
+            for_stmt.span,
+        );
+        let loop_param = self.builder.allocate_local(IRType::Any);
+        self.symbol_map.insert(
+            for_stmt.item.name.clone(),
+            SymbolBinding::Local(loop_param, IRType::Any),
+        );
+        self.builder.emit_effect(
+            Op::Store {
+                target: Value::Local(loop_param),
+                value: Value::Temp(elem),
+            },
+            for_stmt.span,
+        );
+
+        self.lower_block(&for_stmt.body);
+        self.builder
+            .emit_terminator(TerminatorKind::Jump(inc_block), for_stmt.span);
+
+        // Increment path: idx = idx + 1
+        self.builder.enter_block(inc_block, "for_inc".to_string());
+        let old_idx = self.builder.emit_instruction(
+            Op::Load(Value::Local(idx_local)),
+            IRType::Int64,
+            for_stmt.span,
+        );
+        let one = self.builder.emit_instruction(
+            Op::Constant(LiteralVal::Int(1)),
+            IRType::Int64,
+            for_stmt.span,
+        );
+        let new_idx = self.builder.emit_instruction(
+            Op::BinaryOp {
+                op: techscript_syntax::TokenKind::Plus,
+                left: Value::Temp(old_idx),
+                right: Value::Temp(one),
+            },
+            IRType::Int64,
+            for_stmt.span,
+        );
+        self.builder.emit_effect(
+            Op::Store {
+                target: Value::Local(idx_local),
+                value: Value::Temp(new_idx),
+            },
+            for_stmt.span,
+        );
+        self.builder
+            .emit_terminator(TerminatorKind::Jump(cond_block), for_stmt.span);
+
+        self.break_stack.pop();
+        self.continue_stack.pop();
+
+        // Exit path
+        self.builder.enter_block(exit_block, "for_exit".to_string());
+    }
+
+    fn lower_repeat(&mut self, repeat_stmt: &techscript_ast::RepeatStmt) {
+        let cond_block = self.builder.new_block("repeat_cond".to_string());
+        let body_block = self.builder.new_block("repeat_body".to_string());
+        let exit_block = self.builder.new_block("repeat_exit".to_string());
+
+        self.builder
+            .emit_terminator(TerminatorKind::Jump(cond_block), repeat_stmt.span);
+
+        // Cond: evaluate condition each iteration
+        self.builder
+            .enter_block(cond_block, "repeat_cond".to_string());
+        let cond_val = self.lower_expression(&repeat_stmt.count);
+        self.builder.emit_terminator(
+            TerminatorKind::ConditionalJump {
+                cond: cond_val,
+                then_block: body_block,
+                else_block: exit_block,
+            },
+            repeat_stmt.span,
+        );
+
+        // Body
+        self.break_stack.push(exit_block);
+        self.continue_stack.push(cond_block);
+
+        self.builder
+            .enter_block(body_block, "repeat_body".to_string());
+        self.lower_block(&repeat_stmt.body);
+        self.builder
+            .emit_terminator(TerminatorKind::Jump(cond_block), repeat_stmt.span);
+
+        self.break_stack.pop();
+        self.continue_stack.pop();
+
+        self.builder
+            .enter_block(exit_block, "repeat_exit".to_string());
+    }
+
+    fn lower_try(&mut self, try_stmt: &techscript_ast::TryStmt) {
+        // Lower try blocks as consecutive basic blocks
+        let try_block = self.builder.new_block("try_body".to_string());
+        let try_next = self.builder.new_block("try_next".to_string());
+        let catch_block = self.builder.new_block("catch_body".to_string());
+        let merge_block = self.builder.new_block("try_merge".to_string());
+
+        let catch_var = self.builder.allocate_local(IRType::String);
+        self.symbol_map.insert(
+            try_stmt.catch_var.name.clone(),
+            SymbolBinding::Local(catch_var, IRType::String),
+        );
+
+        self.builder.emit_effect(
+            Op::Try {
+                catch_block,
+                catch_var,
+            },
+            try_stmt.span,
+        );
+
+        self.builder
+            .emit_terminator(TerminatorKind::Jump(try_block), try_stmt.span);
+
+        // Try Body
+        self.builder.enter_block(try_block, "try_body".to_string());
+        self.lower_block(&try_stmt.body);
+        if !self.builder.has_terminator() {
+            self.builder
+                .emit_terminator(TerminatorKind::Jump(try_next), try_stmt.span);
+        }
+
+        // Try next (normal completion path — runs EndTry then jumps to merge)
+        self.builder.enter_block(try_next, "try_next".to_string());
+        self.builder.emit_effect(Op::EndTry, try_stmt.span);
+        self.builder
+            .emit_terminator(TerminatorKind::Jump(merge_block), try_stmt.span);
+
+        // Catch Body
+        self.builder
+            .enter_block(catch_block, "catch_body".to_string());
+        self.lower_block(&try_stmt.catch_body);
+        self.builder
+            .emit_terminator(TerminatorKind::Jump(merge_block), try_stmt.span);
+
+        // Merge
+        self.builder
+            .enter_block(merge_block, "try_merge".to_string());
     }
 }
 

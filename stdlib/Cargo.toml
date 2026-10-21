@@ -1,6 +1,7 @@
 [package]
 name = "techscript_stdlib"
 version = "2.0.0"
+license = "Apache-2.0"
 edition = "2021"
 description = "Extended modular libraries (io, math, string, file, web) for TechScript 2.0"
 
@@ -9,23 +10,26 @@ techscript_runtime = { path = "../runtime/runtime" }
 serde_json = { workspace = true }
 serde = { workspace = true }
 indexmap = { version = "2", features = ["serde"] }
-ureq = { version = "2.9", features = ["json"] }
+ureq = { version = "2.10", features = ["json"] }
 toml = { workspace = true }
 rusqlite = { version = "0.40", features = ["bundled"] }
 md5 = "0.8"
-sha2 = "0.10"
+sha2 = "0.11"
 sha-1 = "0.10.1"
 aes-gcm = "0.11"
 bcrypt = "0.19"
-zip = "2.1"
+
 tar = "0.4"
 flate2 = "1.0"
 crc = "3.0"
 image = "0.25"
 tiny_http = "0.12"
-rand = "0.9"
+rand = "0.8"
+zip = "9.0"
+shlex = "2.0"
+url = "2.5"
 base64 = "0.23"
-quick-xml = "0.41"
+quick-xml = "0.42"
 qrcode = "0.14"
 notify-rust = "4.10"
 chrono = "0.4"
@@ -35,3 +39,4 @@ printpdf = "0.12"
 uuid = { version = "1", features = ["v4"] }
 rustls = { version = "0.23", optional = true }
 tokio = { version = "1", features = ["rt", "macros", "sync", "time"], optional = true }
+hex = "0.4.3"
